@@ -302,7 +302,7 @@ Zgodnie z wytycznymi, aplikacja jest obowiązkowo skonteneryzowana.
 **1. Klonowanie repozytorium**
 
 ```
-git clone [https://github.com/](https://github.com/)<twoj-org>/pl-bank-system.git
+git clone https://github.com/jczesnak/Polish-Bank-B.git
 ```
 
 
@@ -312,7 +312,7 @@ cd polish-bank-b
 ``` 
 
 
-** 2. Konfiguracja środowiska** Skopiuj szablon zmiennych:
+**2. Konfiguracja środowiska** Skopiuj szablon zmiennych:
 
 ```
 cp .env.example .env
