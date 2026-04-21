@@ -1,11 +1,6 @@
-Oto poprawiony kod Twojego pliku `README.md`.
-
-Problem polegał na tym, że w kodzie znajdowało się mnóstwo niepotrzebnych, pustych linii oraz tzw. "twardych spacji" (non-breaking spaces), które rozbijały strukturę tabel w Markdownie. Tabele wymagają, aby wiersze następowały bezpośrednio po sobie, bez pustych przerw. Uporządkowałem również bloki z kodem oraz diagramy Mermaid, aby renderowały się poprawnie.
-
-Skopiuj poniższy kod i wklej go do swojego pliku:
 
 
-# PL Bank System
+# Polish Bank B
 
 Aplikacja webowa symulująca działanie polskiego banku detalicznego. Projekt grupowy — moduł **Bank PL (Polska)**.
 
