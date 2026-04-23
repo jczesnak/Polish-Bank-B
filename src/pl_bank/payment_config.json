@@ -1,0 +1,14 @@
+{
+  "PaymentSessions": {
+    "Elixir": {
+      "BatchWindowMinutes": 1,
+      "SessionHours": [9, 12, 15]
+    },
+    "ExpressElixir": {
+      "TimeoutMinutes": 2
+    },
+    "Sorbnet": {
+      "TimeoutSeconds": 10
+    }
+  }
+}
