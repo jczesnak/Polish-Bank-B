@@ -60,6 +60,12 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'phone_number']
+
+
 class AccountSerializer(serializers.ModelSerializer):
     available_balance = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     account_type_display = serializers.CharField(source='get_account_type_display', read_only=True)

@@ -1,8 +1,8 @@
 {
   "PaymentSessions": {
     "Elixir": {
-      "BatchWindowMinutes": 1,
-      "SessionHours": [9, 12, 15]
+      "BatchWindowMinutes": 2,
+      "SessionHours": null
     },
     "ExpressElixir": {
       "TimeoutMinutes": 2
