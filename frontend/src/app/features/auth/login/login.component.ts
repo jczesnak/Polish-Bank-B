@@ -8,83 +8,7 @@ import { AuthService } from '../../../core/services/auth.service';
   selector: 'app-login',
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink, NgIf],
-  template: `
-    <div class="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div class="w-full max-w-md">
-
-        <!-- Logo -->
-        <div class="text-center mb-8">
-          <div class="inline-flex items-center gap-3 mb-3">
-            <div class="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-            </div>
-            <span class="text-white text-2xl font-bold tracking-tight">Polish Bank</span>
-          </div>
-          <p class="text-slate-400 text-sm">Zaloguj się do swojego konta</p>
-        </div>
-
-        <!-- Card -->
-        <div class="card p-8">
-          <form [formGroup]="form" (ngSubmit)="onSubmit()">
-
-            <div class="mb-5">
-              <label class="label">Adres email</label>
-              <input
-                formControlName="email"
-                type="email"
-                class="input-field"
-                placeholder="jan.kowalski@example.com"
-                autocomplete="email"
-              />
-              <p *ngIf="form.get('email')?.touched && form.get('email')?.invalid"
-                 class="mt-1.5 text-xs text-red-400">
-                Podaj prawidłowy adres email.
-              </p>
-            </div>
-
-            <div class="mb-6">
-              <label class="label">Hasło</label>
-              <input
-                formControlName="password"
-                type="password"
-                class="input-field"
-                placeholder="••••••••"
-                autocomplete="current-password"
-              />
-            </div>
-
-            <div *ngIf="error()" class="mb-4 p-3 bg-red-950/60 border border-red-900 rounded-lg text-red-400 text-sm">
-              {{ error() }}
-            </div>
-
-            <button
-              type="submit"
-              [disabled]="loading() || form.invalid"
-              class="btn-primary w-full flex items-center justify-center gap-2 text-base"
-            >
-              <svg *ngIf="loading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              {{ loading() ? 'Logowanie...' : 'Zaloguj się' }}
-            </button>
-          </form>
-
-          <p class="text-center text-slate-400 text-sm mt-6">
-            Nie masz konta?
-            <a routerLink="/auth/register" class="text-indigo-400 hover:text-indigo-300 font-medium ml-1">
-              Zarejestruj się
-            </a>
-          </p>
-        </div>
-
-      </div>
-    </div>
-  `,
+  templateUrl: './login.component.html',
 })
 export class LoginComponent {
   form = this.fb.group({
@@ -103,6 +27,7 @@ export class LoginComponent {
     this.error.set('');
 
     const { email, password } = this.form.value as { email: string; password: string };
+
     this.auth.login({ email, password }).subscribe({
       next: () => this.loading.set(false),
       error: (err) => {

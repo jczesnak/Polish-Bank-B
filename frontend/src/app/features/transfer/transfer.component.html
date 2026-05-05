@@ -1,0 +1,62 @@
+<div class="max-w-2xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md border border-gray-200">
+  <h2 class="text-2xl font-semibold mb-6 text-gray-800">Nowy przelew wewnętrzny</h2>
+
+  <!-- Komunikaty o sukcesie/błędzie -->
+  <div *ngIf="successMessage" class="mb-4 p-4 text-green-700 bg-green-100 rounded-md">
+    {{ successMessage }}
+  </div>
+  <div *ngIf="errorMessage" class="mb-4 p-4 text-red-700 bg-red-100 rounded-md">
+    {{ errorMessage }}
+  </div>
+
+  <form [formGroup]="transferForm" (ngSubmit)="onSubmit()" class="space-y-4">
+    
+    <!-- Rachunek nadawcy -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Konto nadawcy (ID)</label>
+      <input type="number" formControlName="sender_account" 
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <p *ngIf="transferForm.get('sender_account')?.invalid && transferForm.get('sender_account')?.touched" 
+         class="text-red-500 text-xs mt-1">Wybierz konto nadawcy.</p>
+    </div>
+
+    <!-- IBAN odbiorcy -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Numer konta (IBAN) odbiorcy</label>
+      <input type="text" formControlName="recipient_iban" placeholder="PL..."
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <p *ngIf="transferForm.get('recipient_iban')?.invalid && transferForm.get('recipient_iban')?.touched" 
+         class="text-red-500 text-xs mt-1">Podaj poprawny numer rachunku.</p>
+    </div>
+
+    <!-- Nazwa odbiorcy -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Nazwa odbiorcy</label>
+      <input type="text" formControlName="recipient_name" placeholder="Jan Kowalski"
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <!-- Kwota -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Kwota przelewu (PLN)</label>
+      <input type="number" formControlName="amount" step="0.01" placeholder="0.00"
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <p *ngIf="transferForm.get('amount')?.invalid && transferForm.get('amount')?.touched" 
+         class="text-red-500 text-xs mt-1">Podaj poprawną kwotę (min. 0.01).</p>
+    </div>
+
+    <!-- Tytuł przelewu -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Tytuł przelewu</label>
+      <input type="text" formControlName="title" placeholder="np. Za zakupy"
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <!-- Przycisk wysyłania -->
+    <button type="submit" [disabled]="transferForm.invalid || isLoading"
+            class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200">
+      {{ isLoading ? 'Przetwarzanie...' : 'Wykonaj przelew' }}
+    </button>
+
+  </form>
+</div>

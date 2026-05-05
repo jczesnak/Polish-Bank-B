@@ -34,6 +34,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/settings.component').then((m) => m.SettingsComponent),
       },
+      // Nowa ścieżka dla przelewów wewnętrznych
+      {
+        path: 'transfer',
+        loadComponent: () =>
+          import('./features/transfer/transfer.component').then((m) => m.TransferComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

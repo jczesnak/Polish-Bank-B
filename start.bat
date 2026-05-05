@@ -2,9 +2,6 @@
 echo Uruchamianie Polish Bank B...
 echo.
 
-echo Instalowanie zaleznosci Python...
-pip install -r requirements.txt
-echo.
 
 docker compose up --build -d
 
