@@ -1,21 +1,32 @@
-<div class="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-  <div class="w-full max-w-md">
-    <!-- Logo -->
-    <div class="text-center mb-8">
+
+<div class="min-h-screen bg-bank-bg flex items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-brand selection:text-black">
+  
+
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand/5 blur-[120px] rounded-full pointer-events-none z-0"></div>
+
+
+  <div class="w-full max-w-md relative z-10">
+    
+    <div class="text-center mb-8 relative z-10">
       <div class="inline-flex items-center gap-3 mb-3">
-        <div class="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        <div class="w-12 h-12 bg-brand rounded-tl-2xl rounded-br-2xl rounded-tr-md rounded-bl-md flex items-center justify-center shadow-[0_0_20px_rgba(0,229,124,0.5)]">
+  
+          <svg class="w-7 h-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6l3 6-3 6-3-6 3-6z" fill="currentColor"/>
           </svg>
         </div>
-        <span class="text-white text-2xl font-bold tracking-tight">Polish Bank</span>
+        <span class="text-4xl font-bold tracking-tight text-white">
+          Total<span class="text-brand drop-shadow-[0_0_10px_rgba(0,229,124,0.6)]">Bank</span>
+        </span>
       </div>
-      <p class="text-slate-400 text-sm">Zaloguj się do swojego konta</p>
+      <p class="text-gray-400 text-sm mt-2">Zagraj... to znaczy, zaloguj się do konta! 🎰</p>
     </div>
-    <!-- Card -->
-    <div class="card p-8">
+
+
+    <div class="card p-8 shadow-[0_10px_40px_rgba(0,229,124,0.05)] border-brand/10">
       <form [formGroup]="form" (ngSubmit)="onSubmit()">
+        
         <div class="mb-5">
           <label class="label">Adres email</label>
           <input
@@ -26,10 +37,11 @@
             autocomplete="email"
           />
           <p *ngIf="form.get('email')?.touched && form.get('email')?.invalid"
-             class="mt-1.5 text-xs text-red-400">
+             class="mt-1.5 text-xs text-red-400 font-medium">
             Podaj prawidłowy adres email.
           </p>
         </div>
+
         <div class="mb-6">
           <label class="label">Hasło</label>
           <input
@@ -40,15 +52,17 @@
             autocomplete="current-password"
           />
         </div>
-        <div *ngIf="error()" class="mb-4 p-3 bg-red-950/60 border border-red-900 rounded-lg text-red-400 text-sm">
+
+        <div *ngIf="error()" class="mb-6 p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-red-400 text-sm text-center">
           {{ error() }}
         </div>
+
         <button
           type="submit"
           [disabled]="loading() || form.invalid"
-          class="btn-primary w-full flex items-center justify-center gap-2 text-base"
+          class="btn-primary w-full flex items-center justify-center gap-2 text-base py-3"
         >
-          <svg *ngIf="loading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+          <svg *ngIf="loading()" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor"
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -56,9 +70,10 @@
           {{ loading() ? 'Logowanie...' : 'Zaloguj się' }}
         </button>
       </form>
-      <p class="text-center text-slate-400 text-sm mt-6">
+
+      <p class="text-center text-gray-400 text-sm mt-8">
         Nie masz konta?
-        <a routerLink="/auth/register" class="text-indigo-400 hover:text-indigo-300 font-medium ml-1">
+        <a routerLink="/auth/register" class="text-brand hover:text-brand-dark font-semibold ml-1 transition-colors">
           Zarejestruj się
         </a>
       </p>

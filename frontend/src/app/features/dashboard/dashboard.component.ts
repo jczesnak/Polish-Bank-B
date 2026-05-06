@@ -4,34 +4,20 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
-export interface Account {
-  id: string;
-  iban: string;
-  balance: string;
-  blocked_funds: string;
-  available_balance: string;
-  currency: string;
-  account_type: string;
-  account_type_display: string;
-}
+export interface Account { id: string; iban: string; balance: string; blocked_funds: string; available_balance: string; currency: string; account_type: string; account_type_display: string; }
 
-interface Transfer {
-  id: string;
-  recipient_iban: string;
-  recipient_name: string;
-  amount: string;
-  title: string;
-  system_route: string;
-  system_route_display: string;
-  status: string;
+export interface Transfer { 
+  id: string; 
+  recipient_iban: string; 
+  recipient_name: string; 
+  amount: string; 
+  title: string; 
+  system_route: string; 
+  system_route_display: string; 
+  status: string; 
   created_at: string;
+  direction?: 'IN' | 'OUT';
 }
-
-const PAYMENT_SYSTEMS = [
-  { name: 'Elixir Express', desc: 'Natychmiastowy • 24/7', icon: '⚡' },
-  { name: 'Sorbnet', desc: 'Duże kwoty • Bezpieczny', icon: '🛡️' },
-  { name: 'BLIK', desc: 'Mobilny • Natychmiastowy', icon: '📲' },
-];
 
 @Component({
   selector: 'app-dashboard',
@@ -41,34 +27,46 @@ const PAYMENT_SYSTEMS = [
 })
 export class DashboardComponent implements OnInit {
   private http = inject(HttpClient);
-  private auth = inject(AuthService);
+  public auth = inject(AuthService);
   private fb = inject(FormBuilder);
 
+  user = this.auth.user; 
   accounts = signal<Account[]>([]);
   transfers = signal<Transfer[]>([]);
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
-  showTransferModal = signal(false);
-  integrationModalName = signal('');
-  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('internal');
+  
+  // Przelew - stan
+  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('standard');
   transferLoading = signal(false);
   transferError = signal('');
 
-  readonly paymentSystems = PAYMENT_SYSTEMS;
+  // BLIK - stan symulacji
+  blikCode = signal<string | null>(null);
+  blikTimeLeft = signal<number>(0);
+  blikInterval: any;
+
+  // Widget: Kategorie Wydatków (Mockup danych statycznych)
+  spendingCategories = [
+    { name: 'Zakupy i markety', icon: '🛒', amount: 3450, percentage: 75 },
+    { name: 'Rachunki i opłaty', icon: '🏠', amount: 1800, percentage: 40 },
+    { name: 'Transport', icon: '🚗', amount: 850, percentage: 20 },
+    { name: 'Rozrywka', icon: '🍿', amount: 420, percentage: 10 },
+  ];
 
   readonly transferTypes = [
     { key: 'internal' as const, label: 'Wewnętrzny' },
-    { key: 'standard' as const, label: 'Standardowy' },
+    { key: 'standard' as const, label: 'Elixir' },
     { key: 'express' as const, label: 'Express' },
     { key: 'sorbnet' as const, label: 'Sorbnet' },
   ];
 
   readonly selectedTypeInfo = computed(() => {
     const map = {
-      internal: { name: 'Przelew wewnętrzny', desc: 'Natychmiastowy przelew między rachunkami Polish Bank', time: 'Natychmiast', fee: 'Bezpłatny', limit: 'Bez limitu' },
-      standard: { name: 'Elixir Standardowy', desc: 'Przelew krajowy – rozliczenie następnego dnia roboczego', time: '1-2 dni robocze', fee: 'Bezpłatny', limit: '100 000 PLN' },
-      express:  { name: 'Express Elixir', desc: 'Natychmiastowy przelew krajowy 24/7/365', time: 'Do 10 sekund', fee: 'Bezpłatny', limit: '100 000 PLN' },
-      sorbnet:  { name: 'SORBNET3', desc: 'Przelew wysokokwotowy RTGS przez Narodowy Bank Polski', time: 'Natychmiast (RTGS)', fee: '1 PLN', limit: 'Bez limitu' },
+      internal: { time: 'Zaksięgujemy natychmiast', fee: 'Darmowy' },
+      standard: { time: 'Rozliczenie w sesjach KIR', fee: 'Darmowy' },
+      express:  { time: 'Przelew natychmiastowy', fee: 'Darmowy' },
+      sorbnet:  { time: 'System RTGS dla dużych kwot', fee: 'Prowizja 1 PLN' },
     };
     return map[this.selectedTransferType()];
   });
@@ -78,9 +76,9 @@ export class DashboardComponent implements OnInit {
   );
 
   transferForm = this.fb.group({
-    sender_account: ['', Validators.required],
+    sender_account: [''],
     amount: ['', [Validators.required, Validators.min(0.01)]],
-    recipient: ['', Validators.required],
+    recipient: [''], 
     account_number: ['', Validators.required],
     title: ['', Validators.required],
   });
@@ -108,31 +106,44 @@ export class DashboardComponent implements OnInit {
     this.loadingTransfers.set(true);
     this.http.get<Transfer[]>('/api/transfers/').subscribe({
       next: (transfers) => {
-        this.transfers.set(transfers);
+        // Ponieważ backend zwraca tylko nasze wychodzące przelewy, 
+        // oznaczamy je jako 'OUT', aby zachować spójność z widokiem.
+        const mappedTransfers = transfers.map(t => ({
+          ...t,
+          direction: 'OUT'
+        })) as Transfer[];
+
+        this.transfers.set(mappedTransfers);
         this.loadingTransfers.set(false);
       },
       error: () => this.loadingTransfers.set(false),
     });
   }
 
-  openTransferModal() {
-    this.showTransferModal.set(true);
-    this.transferError.set('');
-    this.transferForm.patchValue({ amount: '', recipient: '', account_number: '', title: '' });
+  generateBlik() {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    this.blikCode.set(code);
+    this.blikTimeLeft.set(120);
+
+    if (this.blikInterval) clearInterval(this.blikInterval);
+    
+    this.blikInterval = setInterval(() => {
+      this.blikTimeLeft.update(t => t - 1);
+      if (this.blikTimeLeft() <= 0) {
+        clearInterval(this.blikInterval);
+        this.blikCode.set(null);
+      }
+    }, 1000);
   }
-
-  closeTransferModal() { this.showTransferModal.set(false); }
-
-  showIntegrationInfo(name: string) { this.integrationModalName.set(name); }
 
   submitTransfer() {
     if (this.transferForm.invalid) return;
     this.transferLoading.set(true);
     this.transferError.set('');
 
-    const isInternal = this.selectedTransferType() === 'internal';
     const systemMap = { internal: 'INTERNAL', standard: 'ELIXIR', express: 'EXPRESS_ELIXIR', sorbnet: 'SORBNET' };
     const v = this.transferForm.value;
+    const isInternal = this.selectedTransferType() === 'internal';
 
     const payload = {
       sender_account: v['sender_account'],
@@ -148,7 +159,7 @@ export class DashboardComponent implements OnInit {
     this.http.post<Transfer>(endpointUrl, payload).subscribe({
       next: () => {
         this.transferLoading.set(false);
-        this.closeTransferModal();
+        this.transferForm.patchValue({ amount: '', account_number: '', title: '', recipient: '' });
         this.loadAccounts();
         this.loadTransfers();
       },

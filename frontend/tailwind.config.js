@@ -7,12 +7,16 @@ module.exports = {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
-        'bank-bg': '#0d1117',
-        'bank-card': '#161b22',
-        'bank-surface': '#1c2333',
-        'bank-border': '#30363d',
+        'bank-bg': '#0B1110', 
+        'bank-panel': '#121A18', 
+        'bank-border': '#1F2E2A',
+        'brand': {
+          DEFAULT: '#52FFB8',
+          dark: '#00C978',
+          glow: 'rgba(82, 255, 184, 0.15)',
+        }
       },
     },
   },
   plugins: [],
-};
+}
