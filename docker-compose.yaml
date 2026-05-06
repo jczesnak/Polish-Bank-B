@@ -35,12 +35,16 @@ services:
       - ./src:/app/src
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      
+      - /app/node_modules
     ports:
-      - "4200:80"
+      - "4200:4200"
+    command: >
+      sh -c "npm install && npm start -- --host 0.0.0.0 --poll 2000"
     depends_on:
       - backend
 
