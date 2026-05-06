@@ -2,19 +2,23 @@ import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
+import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface Account { id: string; iban: string; balance: string; blocked_funds: string; available_balance: string; currency: string; account_type: string; account_type_display: string; }
 
-export interface Transfer { 
-  id: string; 
-  recipient_iban: string; 
-  recipient_name: string; 
-  amount: string; 
-  title: string; 
-  system_route: string; 
-  system_route_display: string; 
-  status: string; 
+export interface Transfer {
+  id: string;
+  sender_iban?: string;
+  sender_name?: string;
+  recipient_iban: string;
+  recipient_name: string;
+  amount: string;
+  title: string;
+  system_route: string;
+  system_route_display: string;
+  status: string;
   created_at: string;
   direction?: 'IN' | 'OUT';
 }
@@ -29,30 +33,46 @@ export class DashboardComponent implements OnInit {
   private http = inject(HttpClient);
   public auth = inject(AuthService);
   private fb = inject(FormBuilder);
+  private notifSvc = inject(NotificationService);
 
-  user = this.auth.user; 
+  user = this.auth.user;
   accounts = signal<Account[]>([]);
   transfers = signal<Transfer[]>([]);
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
-  
-  // Przelew - stan
+  private previousBalance = -1;
+
   selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('standard');
   transferLoading = signal(false);
   transferError = signal('');
 
-  // BLIK - stan symulacji
   blikCode = signal<string | null>(null);
   blikTimeLeft = signal<number>(0);
   blikInterval: any;
 
-  // Widget: Kategorie Wydatków (Mockup danych statycznych)
-  spendingCategories = [
-    { name: 'Zakupy i markety', icon: '🛒', amount: 3450, percentage: 75 },
-    { name: 'Rachunki i opłaty', icon: '🏠', amount: 1800, percentage: 40 },
-    { name: 'Transport', icon: '🚗', amount: 850, percentage: 20 },
-    { name: 'Rozrywka', icon: '🍿', amount: 420, percentage: 10 },
+  historyFilter = signal<'all' | 'out' | 'in'>('all');
+
+  readonly historyFilters = [
+    { key: 'all' as const, label: 'Wszystkie' },
+    { key: 'out' as const, label: 'Wychodzące' },
+    { key: 'in' as const, label: 'Przychodzące' },
   ];
+
+  readonly filteredTransfers = computed(() => {
+    const f = this.historyFilter();
+    const all = this.transfers();
+    if (f === 'all') return all;
+    return all.filter(t => t.direction === (f === 'in' ? 'IN' : 'OUT'));
+  });
+
+  readonly historyCounts = computed(() => {
+    const all = this.transfers();
+    return {
+      all: all.length,
+      out: all.filter(t => t.direction === 'OUT').length,
+      in: all.filter(t => t.direction === 'IN').length,
+    };
+  });
 
   readonly transferTypes = [
     { key: 'internal' as const, label: 'Wewnętrzny' },
@@ -75,10 +95,61 @@ export class DashboardComponent implements OnInit {
     this.accounts().reduce((sum, acc) => sum + parseFloat(acc.balance), 0),
   );
 
+  readonly wydatki = computed(() =>
+    this.transfers().filter(t => t.direction === 'OUT')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+  );
+
+  readonly wplywy = computed(() =>
+    this.transfers().filter(t => t.direction === 'IN')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+  );
+
+  readonly balanceChartData = computed(() => {
+    const sorted = [...this.transfers()]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const current = this.totalBalance();
+    const points: { label: string; balance: number }[] = [
+      { label: 'Teraz', balance: current },
+    ];
+
+    let running = current;
+    for (const t of sorted.slice(0, 7)) {
+      running += t.direction === 'OUT' ? parseFloat(t.amount) : -parseFloat(t.amount);
+      const d = new Date(t.created_at);
+      points.push({
+        label: d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
+        balance: Math.max(0, running),
+      });
+    }
+
+    const reversed = points.reverse();
+    const maxBal = Math.max(...reversed.map(p => p.balance), 1);
+
+    return reversed.map(p => ({
+      label: p.label,
+      balance: p.balance,
+      balanceStr: p.balance.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      heightPct: Math.max(Math.round((p.balance / maxBal) * 100), 5),
+      isCurrent: p.label === 'Teraz',
+    }));
+  });
+
+  readonly minBalance = computed(() => {
+    const d = this.balanceChartData();
+    return d.length > 0 ? Math.min(...d.map(p => p.balance)) : 0;
+  });
+
+  readonly maxBalance = computed(() => {
+    const d = this.balanceChartData();
+    return d.length > 0 ? Math.max(...d.map(p => p.balance)) : 0;
+  });
+
   transferForm = this.fb.group({
     sender_account: [''],
     amount: ['', [Validators.required, Validators.min(0.01)]],
-    recipient: [''], 
+    recipient: [''],
     account_number: ['', Validators.required],
     title: ['', Validators.required],
   });
@@ -94,6 +165,14 @@ export class DashboardComponent implements OnInit {
       next: (accounts) => {
         this.accounts.set(accounts);
         this.loadingAccounts.set(false);
+
+        const newBalance = accounts.reduce((s, a) => s + parseFloat(a.balance), 0);
+        if (this.previousBalance >= 0 && newBalance > this.previousBalance) {
+          const diff = (newBalance - this.previousBalance).toFixed(2);
+          this.notifSvc.add(`Otrzymano środki: +${diff} PLN`, 'in');
+        }
+        this.previousBalance = newBalance;
+
         if (accounts.length > 0) {
           this.transferForm.patchValue({ sender_account: accounts[0].id });
         }
@@ -104,16 +183,16 @@ export class DashboardComponent implements OnInit {
 
   private loadTransfers() {
     this.loadingTransfers.set(true);
-    this.http.get<Transfer[]>('/api/transfers/').subscribe({
-      next: (transfers) => {
-        // Ponieważ backend zwraca tylko nasze wychodzące przelewy, 
-        // oznaczamy je jako 'OUT', aby zachować spójność z widokiem.
-        const mappedTransfers = transfers.map(t => ({
-          ...t,
-          direction: 'OUT'
-        })) as Transfer[];
-
-        this.transfers.set(mappedTransfers);
+    forkJoin({
+      outgoing: this.http.get<Transfer[]>('/api/transfers/').pipe(catchError(() => of([]))),
+      incoming: this.http.get<Transfer[]>('/api/transfers/incoming/').pipe(catchError(() => of([]))),
+    }).subscribe({
+      next: ({ outgoing, incoming }) => {
+        const merged = [
+          ...outgoing.map(t => ({ ...t, direction: 'OUT' as const })),
+          ...incoming.map(t => ({ ...t, direction: 'IN' as const })),
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        this.transfers.set(merged);
         this.loadingTransfers.set(false);
       },
       error: () => this.loadingTransfers.set(false),
@@ -126,7 +205,7 @@ export class DashboardComponent implements OnInit {
     this.blikTimeLeft.set(120);
 
     if (this.blikInterval) clearInterval(this.blikInterval);
-    
+
     this.blikInterval = setInterval(() => {
       this.blikTimeLeft.update(t => t - 1);
       if (this.blikTimeLeft() <= 0) {
@@ -145,6 +224,9 @@ export class DashboardComponent implements OnInit {
     const v = this.transferForm.value;
     const isInternal = this.selectedTransferType() === 'internal';
 
+    const amount = parseFloat((v['amount'] as string) || '0').toFixed(2);
+    const recipient = (v['recipient'] as string) || 'odbiorca';
+
     const payload = {
       sender_account: v['sender_account'],
       recipient_iban: (v['account_number'] as string).replace(/\s/g, ''),
@@ -159,6 +241,7 @@ export class DashboardComponent implements OnInit {
     this.http.post<Transfer>(endpointUrl, payload).subscribe({
       next: () => {
         this.transferLoading.set(false);
+        this.notifSvc.add(`Przelew ${amount} PLN → ${recipient} wysłany pomyślnie`, 'out');
         this.transferForm.patchValue({ amount: '', account_number: '', title: '', recipient: '' });
         this.loadAccounts();
         this.loadTransfers();

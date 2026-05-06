@@ -4,6 +4,7 @@ echo.
 
 
 docker compose up --build -d
+docker compose up --build 
 
 echo.
 echo Czekam az serwisy beda gotowe...

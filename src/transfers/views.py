@@ -11,6 +11,15 @@ from .serializers import TransferSerializer, InternalTransferSerializer
 from accounts.models import Account
 
 
+class IncomingTransferListView(generics.ListAPIView):
+    serializer_class = TransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_ibans = Account.objects.filter(user=self.request.user).values_list('iban', flat=True)
+        return Transfer.objects.filter(recipient_iban__in=user_ibans).order_by('-created_at')
+
+
 class TransferListCreateView(generics.ListCreateAPIView):
     serializer_class = TransferSerializer
     permission_classes = [IsAuthenticated]

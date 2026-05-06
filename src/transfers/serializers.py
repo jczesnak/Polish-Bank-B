@@ -5,11 +5,18 @@ from .models import Transfer
 class TransferSerializer(serializers.ModelSerializer):
     system_route_display = serializers.CharField(source='get_system_route_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    sender_iban = serializers.CharField(source='sender_account.iban', read_only=True)
+    sender_name = serializers.SerializerMethodField(read_only=True)
+
+    def get_sender_name(self, obj):
+        u = obj.sender_account.user
+        return f"{u.first_name} {u.last_name}".strip()
 
     class Meta:
         model = Transfer
         fields = [
-            'id', 'sender_account', 'recipient_iban', 'recipient_name',
+            'id', 'sender_account', 'sender_iban', 'sender_name',
+            'recipient_iban', 'recipient_name',
             'amount', 'title', 'system_route', 'system_route_display',
             'status', 'status_display', 'created_at', 'processed_at',
         ]
