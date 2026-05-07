@@ -1,7 +1,6 @@
-<div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-12 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-12 gap-6 relative z-10 items-start">
   
   <div class="lg:col-span-1 xl:col-span-3 flex flex-col gap-6">
-    
     <div>
       <h2 class="text-sm text-gray-400 mb-3 uppercase tracking-wider font-semibold">Twoja Karta</h2>
       <div class="relative w-full aspect-[1.58/1] rounded-2xl p-5 flex flex-col justify-between overflow-hidden shadow-[0_10px_40px_rgba(0,229,124,0.15)] group cursor-pointer transition-transform hover:-translate-y-1">
@@ -34,7 +33,6 @@
         </div>
       </div>
 
-
       <div class="card p-5 mt-5">
         <div class="space-y-3 text-sm">
           <div class="flex justify-between"><span class="text-gray-500">Status</span><span class="text-brand font-medium">Aktywna</span></div>
@@ -42,32 +40,6 @@
           <div class="flex justify-between"><span class="text-gray-500">Dostępne środki</span><span class="text-white">{{ totalBalance() | number:'1.2-2' }}</span></div>
         </div>
         <button class="w-full mt-4 bg-white text-black font-semibold rounded-lg py-2 hover:bg-gray-200 transition-colors">Szczegóły</button>
-      </div>
-    </div>
-
-
-    <div>
-      <h2 class="text-sm text-gray-400 mb-3 uppercase tracking-wider font-semibold">Płatność BLIK</h2>
-      <div class="card p-6 flex flex-col items-center justify-center text-center relative overflow-hidden h-[180px]">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-brand blur-[80px] opacity-10 rounded-full pointer-events-none"></div>
-        
-        <div *ngIf="!blikCode()" class="z-10 w-full">
-          <button (click)="generateBlik()" class="btn-secondary w-full flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-            Generuj kod BLIK
-          </button>
-        </div>
-
-        <div *ngIf="blikCode()" class="z-10 w-full">
-          <p class="text-xs text-gray-500 uppercase tracking-widest mb-1">Twój kod BLIK</p>
-          <div class="text-4xl font-mono tracking-[0.2em] font-bold text-white mb-4 drop-shadow-[0_0_10px_rgba(0,229,124,0.5)]">
-            {{ blikCode()?.slice(0,3) }} {{ blikCode()?.slice(3,6) }}
-          </div>
-          <div class="w-full bg-bank-bg rounded-full h-1.5 mb-2 overflow-hidden border border-bank-border">
-            <div class="bg-brand h-1.5 transition-all duration-1000 ease-linear" [style.width.%]="(blikTimeLeft() / 120) * 100"></div>
-          </div>
-          <p class="text-xs text-brand font-medium">Ważny przez {{ blikTimeLeft() }}s</p>
-        </div>
       </div>
     </div>
   </div>
@@ -82,6 +54,15 @@
       </div>
     </div>
 
+    <div class="grid grid-cols-2 gap-4">
+      <button (click)="openTransferModal()" class="btn-primary rounded-xl py-3.5 flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(0,229,124,0.2)] hover:shadow-[0_0_20px_rgba(0,229,124,0.4)]">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+        Nowy przelew
+      </button>
+      <button (click)="openBlikModal()" class="btn-secondary rounded-xl py-3.5 flex justify-center items-center gap-2">
+        <span class="text-lg">🎲</span> Generuj BLIK
+      </button>
+    </div>
 
     <div class="grid grid-cols-2 gap-4">
       <div class="card p-5 relative overflow-hidden">
@@ -99,8 +80,7 @@
       </div>
     </div>
 
-
-    <div class="flex flex-col gap-3">
+    <div class="flex-1 flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h2 class="text-sm text-gray-400 uppercase tracking-wider font-semibold">Historia przelewów</h2>
         <div class="flex gap-1.5">
@@ -118,7 +98,7 @@
         <div *ngIf="!loadingTransfers() && filteredTransfers().length === 0" class="text-center py-10 text-gray-500 text-sm">
           Brak operacji.
         </div>
-        <div class="overflow-y-auto max-h-72">
+        <div class="overflow-y-auto max-h-[400px]">
           <div *ngFor="let tx of filteredTransfers()" class="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors border-b border-bank-border/50 last:border-0">
             <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
                  [ngClass]="tx.direction === 'IN' ? 'bg-brand/10 border border-brand/30 text-brand' : 'bg-bank-bg border border-bank-border text-gray-400'">
@@ -145,9 +125,7 @@
     </div>
   </div>
 
-
   <div class="lg:col-span-1 xl:col-span-4 flex flex-col gap-6">
-    
     <div class="card p-6 relative overflow-hidden">
       <div class="absolute -right-10 -top-10 w-32 h-32 bg-brand blur-[80px] opacity-10 pointer-events-none"></div>
       <div class="flex justify-between items-center mb-4 relative z-10">
@@ -155,91 +133,134 @@
         <span class="text-xs text-gray-600">ostatnie operacje</span>
       </div>
       <div *ngIf="balanceChartData().length > 0" class="relative z-10">
-        <div class="flex items-end gap-1.5 mb-2" style="height: 6rem;">
+        <div class="flex items-end gap-2 mb-3 mt-4" style="height: 10rem;">
           <div *ngFor="let point of balanceChartData()"
-               class="flex-1 rounded-t-sm transition-colors cursor-default"
-               [ngClass]="point.isCurrent ? 'bg-brand shadow-[0_-4px_10px_rgba(82,255,184,0.25)]' : 'bg-brand/35 hover:bg-brand/60'"
+               class="flex-1 rounded-t-md transition-all duration-300 cursor-default"
+               [ngClass]="point.isCurrent ? 'bg-brand shadow-[0_-4px_15px_rgba(82,255,184,0.25)]' : 'bg-brand/30 hover:bg-brand/50'"
                [style.height]="point.heightPct + '%'"
                [title]="point.balanceStr + ' PLN'">
           </div>
         </div>
-        <div class="flex gap-1.5">
+        <div class="flex gap-2">
           <div *ngFor="let point of balanceChartData()"
-               class="flex-1 text-center text-[9px] text-gray-500 truncate">
+               class="flex-1 text-center text-[10px] text-gray-500 truncate">
             {{ point.label }}
           </div>
         </div>
-        <div class="mt-3 pt-3 border-t border-bank-border flex justify-between">
+        <div class="mt-4 pt-4 border-t border-bank-border flex justify-between">
           <span class="text-xs text-gray-500">Min: <span class="text-white">{{ minBalance() | number:'1.0-0' }} PLN</span></span>
           <span class="text-xs text-gray-500">Max: <span class="text-white">{{ maxBalance() | number:'1.0-0' }} PLN</span></span>
         </div>
       </div>
-      <div *ngIf="balanceChartData().length === 0" class="relative z-10 flex items-center justify-center text-gray-500 text-sm" style="height: 6rem;">
-        Brak danych
+      <div *ngIf="balanceChartData().length === 0" class="relative z-10 flex items-center justify-center text-gray-500 text-sm" style="height: 10rem;">
+        Brak danych do wykresu
       </div>
     </div>
+  </div>
+</div>
 
+<div *ngIf="showBlikModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="closeBlikModal()"></div>
+  <div class="relative w-full max-w-sm card p-8 z-10 flex flex-col items-center text-center shadow-[0_0_60px_rgba(0,229,124,0.15)] border-brand/30 bg-bank-panel/95">
+    
+    <button (click)="closeBlikModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors bg-bank-bg p-2 rounded-full border border-bank-border hover:border-brand/50">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+    </button>
+    
+    <div class="w-14 h-14 bg-brand/10 rounded-full flex items-center justify-center mb-3">
+      <span class="text-2xl">🎲</span>
+    </div>
+    <h2 class="text-2xl font-light tracking-wide text-white mb-1">Kod BLIK</h2>
+    <p class="text-sm text-gray-400 mb-6">Wpisz poniższy kod w terminalu, aby zapłacić.</p>
 
-    <div class="flex-1 flex flex-col">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm text-gray-400 uppercase tracking-wider font-semibold">Nowy Przelew</h2>
+    <div class="relative w-48 h-48 flex items-center justify-center mb-6">
+      <svg class="absolute inset-0 w-full h-full transform -rotate-90 drop-shadow-[0_0_10px_rgba(0,229,124,0.4)]" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#1F2E2A" stroke-width="4"></circle>
+        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"
+                class="text-brand transition-[stroke-dashoffset] duration-1000 ease-linear"
+                stroke-dasharray="282.74" 
+                [style.stroke-dashoffset]="282.74 - (blikTimeLeft() / 120) * 282.74">
+        </circle>
+      </svg>
+      <div class="text-center z-10 flex flex-col justify-center items-center">
+        <div class="text-4xl font-mono tracking-[0.15em] font-bold text-white drop-shadow-[0_0_10px_rgba(0,229,124,0.6)]">
+          {{ blikCode()?.slice(0,3) }}<br>{{ blikCode()?.slice(3,6) }}
+        </div>
       </div>
+    </div>
+    
+    <p class="text-sm font-medium tracking-wide" [ngClass]="blikTimeLeft() < 30 ? 'text-red-400 animate-pulse' : 'text-brand'">
+      Ważny jeszcze {{ blikTimeLeft() }} s
+    </p>
+  </div>
+</div>
 
-      <div class="card p-6 h-full relative overflow-hidden border-brand/30 shadow-[0_0_30px_rgba(0,229,124,0.05)]">
-        <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-brand/10 to-transparent pointer-events-none"></div>
+<div *ngIf="showTransferModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="closeTransferModal()"></div>
+  <div class="relative w-full max-w-xl card p-0 overflow-hidden z-10 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-bank-border">
+
+    <div class="px-8 py-6 border-b border-bank-border flex items-center justify-between bg-bank-bg/90 backdrop-blur-sm">
+      <div>
+        <h2 class="text-2xl font-light tracking-wide text-white">Nowy przelew</h2>
+        <p class="text-sm text-gray-400 mt-1">Wybierz rodzaj płatności i uzupełnij formularz</p>
+      </div>
+      <button (click)="closeTransferModal()" class="text-gray-500 hover:text-white p-2.5 bg-bank-panel rounded-full border border-bank-border transition-colors hover:border-brand/50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+
+    <div class="p-8 bg-bank-panel relative">
+      <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-brand/5 to-transparent pointer-events-none"></div>
+      
+      <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="relative z-10">
         
-        <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="relative z-10 flex flex-col h-full justify-between">
+        <div class="flex bg-bank-bg border border-bank-border rounded-xl p-1.5 gap-1.5 mb-6 shadow-inner">
+          <button *ngFor="let t of transferTypes" type="button"
+            (click)="selectedTransferType.set(t.key)"
+            class="flex-1 py-2.5 px-2 rounded-lg text-sm font-semibold transition-all duration-300"
+            [ngClass]="selectedTransferType() === t.key ? 'bg-brand text-black shadow-md scale-[1.02]' : 'text-gray-400 hover:text-white hover:bg-white/5'">
+            {{ t.label }}
+          </button>
+        </div>
+
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Tytuł operacji</label>
+            <input formControlName="title" type="text" class="input-field py-3 text-base shadow-inner" placeholder="np. Czynsz za styczeń">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Odbiorca (Opcjonalnie)</label>
+            <input formControlName="recipient" type="text" class="input-field py-3 text-base shadow-inner" placeholder="Jan Kowalski">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Konto docelowe</label>
+            <input formControlName="account_number" type="text" class="input-field py-3 font-mono text-lg tracking-wider text-brand shadow-inner" placeholder="PL 1234...">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Kwota</label>
+            <div class="flex gap-3">
+              <input formControlName="amount" type="number" class="input-field py-3 text-xl font-medium flex-1 shadow-inner" placeholder="0.00">
+              <div class="w-24 bg-bank-bg border border-bank-border rounded-lg flex items-center justify-center text-lg font-bold text-gray-400 shadow-inner">PLN</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 flex items-center justify-between border-t border-bank-border pt-6">
+          <div>
+            <p class="text-lg font-bold text-white tracking-wide">{{ selectedTypeInfo().fee }}</p>
+            <p class="text-xs text-brand font-medium uppercase tracking-widest mt-1">{{ selectedTypeInfo().time }}</p>
+          </div>
           
-
-          <div class="flex bg-bank-bg border border-bank-border rounded-lg p-1 gap-1 mb-5 shadow-inner">
-            <button *ngFor="let t of transferTypes" type="button"
-              (click)="selectedTransferType.set(t.key)"
-              class="flex-1 py-1.5 px-1 sm:px-2 rounded-md text-xs font-medium transition-all duration-200"
-              [ngClass]="selectedTransferType() === t.key ? 'bg-brand text-black shadow-sm' : 'text-gray-400 hover:text-white'">
-              {{ t.label }}
-            </button>
-          </div>
-
-          <div class="space-y-4">
-            <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-1">Tytuł operacji</label>
-              <input formControlName="title" type="text" class="input-field py-2 text-sm" placeholder="np. Czynsz za styczeń">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-1">Odbiorca (Opcjonalnie)</label>
-              <input formControlName="recipient" type="text" class="input-field py-2 text-sm" placeholder="Jan Kowalski">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-1">Konto docelowe</label>
-              <input formControlName="account_number" type="text" class="input-field py-2 font-mono text-sm" placeholder="PL 1234...">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-1">Kwota</label>
-              <div class="flex gap-2">
-                <input formControlName="amount" type="number" class="input-field py-2 flex-1" placeholder="0.00">
-                <div class="w-16 bg-bank-bg border border-bank-border rounded-lg flex items-center justify-center text-sm font-semibold text-gray-400">PLN</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-6 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-bold text-white">{{ selectedTypeInfo().fee }}</p>
-              <p class="text-[10px] text-gray-500 font-medium">{{ selectedTypeInfo().time }}</p>
-            </div>
-            
-            <button type="submit" [disabled]="transferLoading() || transferForm.invalid" class="btn-primary rounded-full px-6 flex items-center gap-2">
-              <svg *ngIf="transferLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              <span>{{ transferLoading() ? 'Wysyłanie...' : 'Zatwierdź' }}</span>
-            </button>
-          </div>
-          <p *ngIf="transferError()" class="text-xs text-red-400 font-medium mt-3 bg-red-500/10 p-2 rounded border border-red-500/20">{{ transferError() }}</p>
-        </form>
-      </div>
+          <button type="submit" [disabled]="transferLoading() || transferForm.invalid" class="btn-primary rounded-full px-8 py-3 flex items-center gap-2 text-base shadow-[0_0_15px_rgba(0,229,124,0.3)] hover:shadow-[0_0_25px_rgba(0,229,124,0.5)] transition-all">
+            <svg *ngIf="transferLoading()" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            <span>{{ transferLoading() ? 'Wysyłanie...' : 'Wyślij' }}</span>
+          </button>
+        </div>
+        <p *ngIf="transferError()" class="text-sm text-red-400 font-medium mt-5 bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-center">{{ transferError() }}</p>
+      </form>
     </div>
-
   </div>
 </div>
