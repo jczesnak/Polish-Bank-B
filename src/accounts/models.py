@@ -6,7 +6,7 @@ from django.db import models
 
 class User(AbstractUser):
     pesel = models.CharField(max_length=11, unique=True, blank=True, null=True)
-    phone_number = models.CharField(max_length=15, blank=True)
+    phone_number = models.CharField(max_length=9, blank=True)
     email = models.EmailField(unique=True)
 
     USERNAME_FIELD = 'email'
@@ -51,7 +51,18 @@ class Account(models.Model):
 
     @staticmethod
     def generate_iban():
-        bank_code = "10200000"
+   
+        bank_code = f"1020{random.randint(1000, 9999)}"
+        
         account_number = ''.join([str(random.randint(0, 9)) for _ in range(16)])
-        check_digits = str(random.randint(10, 99))
-        return f"PL{check_digits}{bank_code}{account_number}"
+        
+        bban = bank_code + account_number
+        
+        numeric_iban = bban + "252100"
+        
+        mod = int(numeric_iban) % 97
+        check_digits = 98 - mod
+        
+        check_digits_str = f"{check_digits:02d}"
+        
+        return f"PL{check_digits_str}{bban}"

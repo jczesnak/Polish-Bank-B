@@ -60,7 +60,10 @@
         <div class="mb-4">
           <label class="label">Numer telefonu</label>
           <input formControlName="phone_number" type="tel" class="input-field"
-                 placeholder="+48 123 456 789" />
+                 placeholder="123 456 789" 
+                 (input)="onPhoneInput($event)" />
+          <p *ngIf="form.get('phone_number')?.touched && form.get('phone_number')?.hasError('phone')"
+             class="mt-1.5 text-xs text-red-400 font-medium">Podaj poprawny, 9-cyfrowy numer telefonu.</p>
         </div>
 
         <div class="mb-4">

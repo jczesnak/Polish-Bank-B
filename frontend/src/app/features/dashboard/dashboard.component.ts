@@ -42,7 +42,11 @@ export class DashboardComponent implements OnInit {
   loadingTransfers = signal(true);
   private previousBalance = -1;
 
-  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('standard');
+  // Stan Modali
+  showTransferModal = signal(false);
+  showBlikModal = signal(false);
+
+  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('internal');
   transferLoading = signal(false);
   transferError = signal('');
 
@@ -199,6 +203,28 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  // --- Obsługa Modali ---
+  openTransferModal() {
+    this.showTransferModal.set(true);
+    this.transferError.set('');
+    this.transferForm.patchValue({ amount: '', recipient: '', account_number: '', title: '' });
+  }
+
+  closeTransferModal() { 
+    this.showTransferModal.set(false); 
+  }
+
+  openBlikModal() {
+    this.showBlikModal.set(true);
+    this.generateBlik();
+  }
+
+  closeBlikModal() {
+    this.showBlikModal.set(false);
+    if (this.blikInterval) clearInterval(this.blikInterval);
+    this.blikCode.set(null);
+  }
+
   generateBlik() {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     this.blikCode.set(code);
@@ -242,7 +268,7 @@ export class DashboardComponent implements OnInit {
       next: () => {
         this.transferLoading.set(false);
         this.notifSvc.add(`Przelew ${amount} PLN → ${recipient} wysłany pomyślnie`, 'out');
-        this.transferForm.patchValue({ amount: '', account_number: '', title: '', recipient: '' });
+        this.closeTransferModal();
         this.loadAccounts();
         this.loadTransfers();
       },
