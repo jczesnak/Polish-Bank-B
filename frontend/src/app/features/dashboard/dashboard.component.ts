@@ -53,6 +53,9 @@ export class DashboardComponent implements OnInit {
   blikCode = signal<string | null>(null);
   blikTimeLeft = signal<number>(0);
   blikInterval: any;
+  blikLoading = signal(false);
+  blikError = signal('');
+  blikConfirmed = signal(false);
 
   historyFilter = signal<'all' | 'out' | 'in'>('all');
 
@@ -216,29 +219,50 @@ export class DashboardComponent implements OnInit {
 
   openBlikModal() {
     this.showBlikModal.set(true);
-    this.generateBlik();
+    this.blikCode.set(null);
+    this.blikError.set('');
+    this.blikConfirmed.set(false);
   }
 
   closeBlikModal() {
     this.showBlikModal.set(false);
     if (this.blikInterval) clearInterval(this.blikInterval);
     this.blikCode.set(null);
+    this.blikConfirmed.set(false);
+    this.blikError.set('');
   }
 
   generateBlik() {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    this.blikCode.set(code);
-    this.blikTimeLeft.set(120);
+    const account = this.accounts()[0];
+    if (!account) return;
 
-    if (this.blikInterval) clearInterval(this.blikInterval);
+    this.blikLoading.set(true);
+    this.blikError.set('');
+    this.blikConfirmed.set(false);
+    this.blikCode.set(null);
 
-    this.blikInterval = setInterval(() => {
-      this.blikTimeLeft.update(t => t - 1);
-      if (this.blikTimeLeft() <= 0) {
-        clearInterval(this.blikInterval);
-        this.blikCode.set(null);
-      }
-    }, 1000);
+    this.http.post<{ code: string; expires_in: number }>('/api/blik/generate/', { account_id: account.id }).subscribe({
+      next: (res) => {
+        this.blikCode.set(res.code);
+        this.blikTimeLeft.set(res.expires_in ?? 120);
+        this.blikLoading.set(false);
+        this.blikConfirmed.set(true);
+        setTimeout(() => this.blikConfirmed.set(false), 3000);
+
+        if (this.blikInterval) clearInterval(this.blikInterval);
+        this.blikInterval = setInterval(() => {
+          this.blikTimeLeft.update(t => t - 1);
+          if (this.blikTimeLeft() <= 0) {
+            clearInterval(this.blikInterval);
+            this.blikCode.set(null);
+          }
+        }, 1000);
+      },
+      error: (err) => {
+        this.blikLoading.set(false);
+        this.blikError.set(err?.error?.detail ?? 'Błąd generowania kodu BLIK.');
+      },
+    });
   }
 
   submitTransfer() {
