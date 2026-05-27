@@ -117,3 +117,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:4200',
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# Integracja z systemem KLIK (BLIK)
+KLIK_BASE_URL = os.environ.get('INTEGRATIONS_BLIK_URL', 'http://localhost:7005')
+BLIK_API_KEY = os.environ.get('BLIK_API_KEY', '')
