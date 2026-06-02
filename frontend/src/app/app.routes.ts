@@ -45,6 +45,21 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/p2p/p2p.component').then((m) => m.P2pComponent),
       },
+      {
+        path: 'junior',
+        loadComponent: () =>
+          import('./features/junior-parent/junior-parent.component').then((m) => m.JuniorParentComponent),
+      },
+      {
+        path: 'junior-dashboard',
+        loadComponent: () =>
+          import('./features/junior-dashboard/junior-dashboard.component').then((m) => m.JuniorDashboardComponent),
+      },
+      {
+        path: 'junior-payments',
+        loadComponent: () =>
+          import('./features/junior-payments/junior-payments.component').then((m) => m.JuniorPaymentsComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

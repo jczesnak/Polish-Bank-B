@@ -5,9 +5,14 @@ from django.db import models
 
 
 class User(AbstractUser):
+    class Role(models.TextChoices):
+        PARENT = 'PARENT', 'Rodzic'
+        JUNIOR = 'JUNIOR', 'Junior'
+
     pesel = models.CharField(max_length=11, unique=True, blank=True, null=True)
     phone_number = models.CharField(max_length=9, blank=True)
     email = models.EmailField(unique=True)
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.PARENT)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']

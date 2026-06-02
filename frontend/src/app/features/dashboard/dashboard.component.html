@@ -1,4 +1,21 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-12 gap-6 relative z-10 items-start">
+
+  <!-- Baner dla rodzica: oczekujące zgody dziecka (w tym BLIK) -->
+  <div *ngIf="user()?.role !== 'JUNIOR' && parentPendingApprovals().length > 0"
+       class="lg:col-span-3 xl:col-span-12 card p-4 border-2 border-yellow-500/40 bg-yellow-950/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <p class="text-white font-semibold flex items-center gap-2">
+        <span>🔔</span> Dziecko czeka na Twoją zgodę ({{ parentPendingApprovals().length }})
+      </p>
+      <p class="text-sm text-yellow-200/80 mt-1">
+        <span *ngIf="parentBlikPendingCount() > 0">🎲 {{ parentBlikPendingCount() }} płatność BLIK — </span>
+        Zatwierdź w „Konto Junior” lub w dzwonku powiadomień.
+      </p>
+    </div>
+    <a routerLink="/junior" class="btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold text-center whitespace-nowrap">
+      Przejdź do zgód →
+    </a>
+  </div>
   
   <div class="lg:col-span-1 xl:col-span-3 flex flex-col gap-6">
     <div>
@@ -209,6 +226,24 @@
     </div>
     <h2 class="text-2xl font-light tracking-wide text-white mb-1">Kod BLIK</h2>
     <p class="text-sm text-gray-400 mb-6">Wpisz poniższy kod w terminalu, aby zapłacić.</p>
+
+    <!-- Oczekująca autoryzacja płatności -->
+    <div *ngIf="pendingBlikAuth() as pending" class="w-full mb-5 p-4 rounded-2xl bg-yellow-950/40 border-2 border-yellow-500/50 text-left">
+      <p class="text-xs uppercase tracking-wider text-yellow-400 font-semibold mb-1">Wymagana autoryzacja</p>
+      <p class="text-white font-semibold">{{ pending.merchant_name || 'Płatność BLIK' }}</p>
+      <p class="text-2xl font-bold text-brand mt-1">{{ pending.amount }} {{ pending.currency }}</p>
+      <p class="text-xs text-gray-400 mt-2">Potwierdź lub odrzuć płatność, żeby dokończyć transakcję w terminalu.</p>
+      <div class="flex gap-2 mt-4">
+        <button type="button" (click)="rejectPendingBlik()" [disabled]="blikAuthLoading()"
+                class="flex-1 rounded-xl py-2.5 text-sm font-semibold border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50">
+          Odrzuć
+        </button>
+        <button type="button" (click)="confirmPendingBlik()" [disabled]="blikAuthLoading()"
+                class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-black hover:bg-brand/90 disabled:opacity-50">
+          {{ blikAuthLoading() ? '...' : 'Autoryzuj' }}
+        </button>
+      </div>
+    </div>
 
     <!-- Potwierdzenie od KLIK -->
     <div *ngIf="blikConfirmed()" class="w-full mb-4 px-4 py-2.5 bg-brand/10 border border-brand/30 rounded-xl flex items-center gap-2 text-brand text-sm font-medium">

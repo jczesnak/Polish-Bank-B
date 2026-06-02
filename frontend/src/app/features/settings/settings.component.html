@@ -55,6 +55,7 @@
 
           <div class="flex items-center gap-3">
             <input
+              *ngIf="!isJunior()"
               type="number"
               step="100"
               min="1"
@@ -64,6 +65,7 @@
               (input)="setTopUpAmount(acc.id, $event)"
             />
             <button
+              *ngIf="!isJunior()"
               (click)="topUp(acc.id)"
               [disabled]="topUpLoading() === acc.id"
               class="btn-secondary text-sm py-2.5 px-6 whitespace-nowrap flex-shrink-0 flex items-center gap-2">
@@ -76,11 +78,11 @@
             </button>
           </div>
           
-          <p *ngIf="topUpSuccess() === acc.id"
+          <p *ngIf="!isJunior() && topUpSuccess() === acc.id"
              class="text-xs text-brand font-medium mt-3 flex items-center gap-1 bg-brand/10 p-2 rounded-lg border border-brand/20">
              ✓ Ładowanie zakończone pomyślnie.
           </p>
-          <p *ngIf="topUpError() === acc.id"
+          <p *ngIf="!isJunior() && topUpError() === acc.id"
              class="text-xs text-red-400 font-medium mt-3 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
             ✗ Błąd doładowania. Upewnij się, że kwota jest poprawna.
           </p>
@@ -90,6 +92,51 @@
           Brak rachunków w systemie.
         </div>
       </div>
+    </div>
+
+
+    <div *ngIf="isJunior()" class="card p-7 shadow-[0_10px_40px_rgba(0,0,0,0.3)]">
+      <h2 class="text-xs font-semibold tracking-wider text-gray-400 uppercase mb-2">
+        Numer telefonu w KLIK
+      </h2>
+      <p class="text-sm text-gray-500 mb-6">
+        Połącz swój numer z kontem Junior, żeby dostawać przelewy BLIK/KLIK na telefon.
+      </p>
+
+      <div *ngIf="aliasSuccess()" class="mb-4 p-3 bg-brand/10 border border-brand/30 rounded-lg text-brand text-sm font-medium">
+        {{ aliasSuccess() }}
+      </div>
+      <div *ngIf="aliasError()" class="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-medium">
+        {{ aliasError() }}
+      </div>
+
+      <ng-container *ngIf="juniorAlias() as alias; else aliasRegister">
+        <div class="bg-bank-bg border border-bank-border rounded-xl p-5 mb-4">
+          <p class="text-lg font-mono text-white">{{ alias.phone }}</p>
+          <p class="text-xs text-gray-500 mt-2 truncate">→ {{ alias.account_iban }}</p>
+          <p class="text-xs text-brand mt-2 font-medium">Numer aktywny — możesz odbierać przelewy</p>
+        </div>
+        <button type="button" (click)="deleteAlias(alias)" class="btn-secondary w-full sm:w-auto px-8">
+          Odłącz numer
+        </button>
+      </ng-container>
+
+      <ng-template #aliasRegister>
+        <form [formGroup]="aliasForm" (ngSubmit)="registerAlias()" class="space-y-4">
+          <div>
+            <label class="label">Numer telefonu</label>
+            <input formControlName="phone" type="tel" class="input-field font-mono"
+                   [placeholder]="user()?.phone_number ? '+48' + user()!.phone_number : '+48501234567'">
+            <p class="text-xs text-gray-500 mt-2">
+              Zostaw puste, aby użyć numeru z profilu
+              <span *ngIf="user()?.phone_number"> ({{ user()!.phone_number }})</span>.
+            </p>
+          </div>
+          <button type="submit" [disabled]="aliasLoading() || !juniorAccount()" class="btn-primary w-full sm:w-auto px-8">
+            {{ aliasLoading() ? 'Łączenie...' : 'Połącz numer z kontem' }}
+          </button>
+        </form>
+      </ng-template>
     </div>
 
 

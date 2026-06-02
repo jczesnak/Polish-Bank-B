@@ -10,6 +10,7 @@ export interface User {
   last_name: string;
   phone_number: string;
   pesel: string;
+  role: 'PARENT' | 'JUNIOR';
 }
 
 interface AuthResponse {
@@ -74,7 +75,7 @@ export class AuthService {
     localStorage.setItem('refresh_token', res.refresh);
     localStorage.setItem('user', JSON.stringify(res.user));
     this._user.set(res.user);
-    this.router.navigate(['/dashboard']);
+    this.router.navigate([res.user.role === 'JUNIOR' ? '/junior-dashboard' : '/dashboard']);
   }
 
   private loadUser(): User | null {

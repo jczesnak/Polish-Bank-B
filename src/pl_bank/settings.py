@@ -14,17 +14,20 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
+    'channels',
     # Local
     'accounts',
     'transfers',
     'cards',
     'blik',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -57,6 +60,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'pl_bank.wsgi.application'
+ASGI_APPLICATION = 'pl_bank.asgi.application'
 
 DATABASES = {
     'default': {
@@ -121,3 +125,11 @@ CORS_ALLOW_CREDENTIALS = True
 # Integracja z systemem KLIK (BLIK)
 KLIK_BASE_URL = os.environ.get('INTEGRATIONS_BLIK_URL', 'http://localhost:7005')
 BLIK_API_KEY = os.environ.get('BLIK_API_KEY', '')
+
+CHANNEL_LAYERS = {
+    'default': {
+        # Lokalny dev działa w jednym procesie ASGI, więc in-memory unika
+        # timeoutów Redis/WSL i nadal daje natychmiastowe eventy WebSocket.
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}

@@ -1,8 +1,9 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl } from '@angular/forms';
 import { NgFor, NgIf, DecimalPipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { PhoneAlias, P2pService } from '../../core/services/p2p.service';
 import { Account } from '../dashboard/dashboard.component';
 
 function passwordMatchValidator(group: AbstractControl) {
@@ -20,10 +21,18 @@ function passwordMatchValidator(group: AbstractControl) {
 export class SettingsComponent implements OnInit {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private p2p = inject(P2pService);
   private fb = inject(FormBuilder);
 
+  readonly user = this.auth.user;
+  readonly isJunior = computed(() => this.user()?.role === 'JUNIOR');
+
   accounts = signal<Account[]>([]);
+  aliases = signal<PhoneAlias[]>([]);
   loadingAccounts = signal(true);
+  aliasLoading = signal(false);
+  aliasError = signal('');
+  aliasSuccess = signal('');
 
   copiedIban = signal('');
 
@@ -55,6 +64,10 @@ export class SettingsComponent implements OnInit {
     { validators: passwordMatchValidator },
   );
 
+  aliasForm = this.fb.group({
+    phone: [''],
+  });
+
   ngOnInit() {
     const user = this.auth.user();
     if (user) {
@@ -65,6 +78,64 @@ export class SettingsComponent implements OnInit {
       });
     }
     this.loadAccounts();
+    if (this.isJunior()) this.loadAliases();
+  }
+
+  juniorAccount() {
+    return this.accounts().find((a) => a.account_type === 'JUNIOR') || null;
+  }
+
+  juniorAlias() {
+    const acc = this.juniorAccount();
+    if (!acc) return null;
+    return this.aliases().find((alias) => alias.account === acc.id) || null;
+  }
+
+  loadAliases() {
+    this.p2p.listAliases().subscribe((aliases) => this.aliases.set(aliases));
+  }
+
+  registerAlias() {
+    const account = this.juniorAccount();
+    if (!account) return;
+
+    this.aliasLoading.set(true);
+    this.aliasError.set('');
+    this.aliasSuccess.set('');
+
+    const phone = (this.aliasForm.value.phone as string) || undefined;
+    this.p2p.registerAlias({ account_id: account.id, phone }).subscribe({
+      next: () => {
+        this.aliasLoading.set(false);
+        this.aliasSuccess.set('Numer połączony z kontem — możesz dostawać przelewy BLIK/KLIK.');
+        this.aliasForm.patchValue({ phone: '' });
+        this.loadAliases();
+        setTimeout(() => this.aliasSuccess.set(''), 5000);
+      },
+      error: (err) => {
+        this.aliasLoading.set(false);
+        this.aliasError.set(this.extractError(err, 'Nie udało się połączyć numeru.'));
+      },
+    });
+  }
+
+  deleteAlias(alias: PhoneAlias) {
+    this.aliasError.set('');
+    this.p2p.deleteAlias(alias.phone).subscribe({
+      next: () => {
+        this.aliasSuccess.set('Numer odłączony od konta.');
+        this.loadAliases();
+        setTimeout(() => this.aliasSuccess.set(''), 4000);
+      },
+      error: (err) => this.aliasError.set(this.extractError(err, 'Nie udało się odłączyć numeru.')),
+    });
+  }
+
+  private extractError(err: any, fallback: string) {
+    const data = err?.error;
+    if (data?.detail) return data.detail;
+    if (typeof data === 'object' && data) return Object.values(data).flat().join(' ');
+    return fallback;
   }
 
   private loadAccounts() {

@@ -4,6 +4,8 @@ from .views import (
     BlikWebhookAuthorizeView,
     BlikPingView,
     BlikTransactionListView,
+    BlikPendingListView,
+    BlikAuthorizationDecisionView,
     P2PAliasView,
     P2PAliasDeleteView,
     P2PLookupView,
@@ -15,6 +17,9 @@ from .views import (
 urlpatterns = [
     path('blik/generate/', BlikGenerateView.as_view(), name='blik-generate'),
     path('blik/transactions/', BlikTransactionListView.as_view(), name='blik-transactions'),
+    path('blik/pending/', BlikPendingListView.as_view(), name='blik-pending'),
+    path('blik/pending/<uuid:pk>/confirm/', BlikAuthorizationDecisionView.as_view(), {'decision': 'confirm'}, name='blik-pending-confirm'),
+    path('blik/pending/<uuid:pk>/reject/', BlikAuthorizationDecisionView.as_view(), {'decision': 'reject'}, name='blik-pending-reject'),
 
     # Webhooki od KLIK. KLIK woła {webhook_url}/authorize oraz {webhook_url}/ping
     # BEZ końcowego slasha, więc rejestrujemy warianty bez slasha (operator

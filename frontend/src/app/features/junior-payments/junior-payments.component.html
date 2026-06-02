@@ -1,0 +1,204 @@
+<div class="min-h-full p-2 pb-8 bg-[radial-gradient(circle_at_top,#ff7ad9_0,#7c3aed_40%,#1e1b4b_100%)] font-['Trebuchet_MS',cursive] relative z-10">
+  <div class="max-w-lg mx-auto space-y-5">
+
+    <div class="flex items-center gap-4">
+      <a routerLink="/junior-dashboard" class="rounded-2xl px-4 py-2 bg-white/20 border-2 border-white/40 text-white font-black text-sm hover:bg-white/30">
+        ← Wróć
+      </a>
+      <h1 class="text-2xl font-black text-white">Płatności</h1>
+    </div>
+
+    <div *ngIf="message()" class="px-4 py-3 rounded-2xl bg-emerald-400/20 border-2 border-emerald-300 text-emerald-100 text-sm font-bold">
+      {{ message() }}
+    </div>
+    <div *ngIf="error()" class="px-4 py-3 rounded-2xl bg-rose-400/20 border-2 border-rose-300 text-rose-100 text-sm font-bold">
+      {{ error() }}
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      <button *ngFor="let tab of tabs" type="button" (click)="setTab(tab.key)"
+              class="rounded-2xl py-3 px-2 border-4 font-black text-sm transition-all"
+              [ngClass]="activeTab() === tab.key
+                ? 'bg-white border-white text-violet-900'
+                : 'bg-white/20 border-white/30 text-white'">
+        <span class="block text-xl mb-0.5">{{ tab.emoji }}</span>
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <section *ngIf="activeTab() === 'internet'" class="rounded-[2rem] p-6 bg-white/95 border-4 border-white shadow-xl">
+      <h2 class="text-lg font-black text-pink-900 mb-1">Płatność internetowa</h2>
+      <p class="text-sm text-slate-500 mb-4">Zapłać kartą prepaid albo kodem BLIK w sklepie online.</p>
+
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <button type="button" (click)="setInternetMethod('card')"
+                class="rounded-xl py-2 font-black text-sm border-2"
+                [ngClass]="internetMethod() === 'card'
+                  ? 'bg-pink-500 border-pink-500 text-white'
+                  : 'border-pink-200 text-pink-700'">
+          💳 Karta
+        </button>
+        <button type="button" (click)="setInternetMethod('blik')"
+                class="rounded-xl py-2 font-black text-sm border-2"
+                [ngClass]="internetMethod() === 'blik'
+                  ? 'bg-orange-400 border-orange-400 text-white'
+                  : 'border-orange-200 text-orange-700'">
+          🎲 BLIK
+        </button>
+      </div>
+
+      <form *ngIf="internetMethod() === 'card'" [formGroup]="cardForm" (ngSubmit)="submitCardPayment()" class="space-y-3">
+        <input class="rounded-2xl px-4 py-3 w-full bg-pink-50 border-2 border-pink-200 outline-none focus:border-pink-500"
+               formControlName="merchant_name" placeholder="Nazwa sklepu">
+        <input class="rounded-2xl px-4 py-3 w-full bg-pink-50 border-2 border-pink-200 outline-none focus:border-pink-500"
+               formControlName="amount" type="number" step="0.01" placeholder="Kwota (PLN)">
+        <button type="submit" class="rounded-2xl py-3 w-full bg-gradient-to-r from-pink-500 to-orange-400 text-white font-black disabled:opacity-50"
+                [disabled]="cardForm.invalid || !card()">
+          Wyślij do akceptacji rodzica
+        </button>
+      </form>
+
+      <div *ngIf="internetMethod() === 'blik'" class="space-y-4">
+        <p class="text-sm text-orange-800 font-semibold">Wygeneruj kod BLIK i wpisz go w sklepie online.</p>
+        <div *ngIf="blikCode(); else internetBlikPlaceholder" class="rounded-3xl bg-gradient-to-br from-yellow-100 to-orange-100 border-4 border-orange-300 px-6 py-5 text-center">
+          <p class="text-4xl font-black tracking-[0.2em] text-slate-900">{{ blikCode() }}</p>
+          <p class="text-sm text-orange-600 font-bold mt-2">Ważny {{ blikTimeLeft() }} s</p>
+        </div>
+        <ng-template #internetBlikPlaceholder>
+          <div class="rounded-3xl bg-orange-50 border-4 border-dashed border-orange-300 py-6 text-center">
+            <p class="text-3xl text-orange-300 font-black">••• •••</p>
+          </div>
+        </ng-template>
+        <button type="button" (click)="generateBlik()" [disabled]="blikLoading() || !account()"
+                class="w-full rounded-2xl py-3.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white font-black disabled:opacity-50">
+          {{ blikLoading() ? 'Generuję...' : (blikCode() ? 'Odśwież kod BLIK' : 'Generuj kod BLIK') }}
+        </button>
+        <p class="text-xs text-slate-500">Po zainicjowaniu płatności w sklepie rodzic dostanie prośbę o zgodę.</p>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab() === 'blik'" class="rounded-[2rem] p-6 bg-gradient-to-br from-yellow-200 to-orange-200 border-4 border-white shadow-xl">
+      <h2 class="text-lg font-black text-orange-900 mb-1">Płatność BLIK-iem</h2>
+      <p class="text-sm text-orange-800 mb-4">Wygeneruj kod i podaj go w terminalu, sklepie stacjonarnym lub online.</p>
+
+      <div *ngIf="blikCode(); else blikPlaceholder" class="rounded-3xl bg-white border-4 border-orange-300 px-6 py-5 mb-4 text-center">
+        <p class="text-5xl font-black tracking-[0.2em] text-slate-900">{{ blikCode() }}</p>
+        <p class="text-sm text-orange-600 font-bold mt-2">Ważny {{ blikTimeLeft() }} s</p>
+      </div>
+      <ng-template #blikPlaceholder>
+        <div class="rounded-3xl bg-white/60 border-4 border-dashed border-orange-300 py-8 mb-4 text-center">
+          <p class="text-3xl text-orange-300 font-black">••• •••</p>
+          <p class="text-sm text-orange-700 font-semibold mt-2">Wygeneruj kod, żeby zapłacić</p>
+        </div>
+      </ng-template>
+
+      <button type="button" (click)="generateBlik()" [disabled]="blikLoading() || !account()"
+              class="w-full rounded-2xl py-3.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white font-black disabled:opacity-50 mb-4">
+        {{ blikLoading() ? 'Generuję...' : (blikCode() ? 'Odśwież kod BLIK' : 'Generuj kod BLIK') }}
+      </button>
+
+      <p class="text-xs text-orange-900/70 mb-4 text-center">Płatność wymaga zgody rodzica po zainicjowaniu przez sklep.</p>
+
+      <div class="rounded-2xl bg-white/80 border-2 border-orange-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-orange-200 flex items-center justify-between">
+          <h3 class="text-sm font-black text-orange-900">Historia BLIK</h3>
+          <button type="button" (click)="loadBlikTransactions()" class="text-xs font-bold text-orange-600 hover:text-orange-900">
+            Odśwież
+          </button>
+        </div>
+        <div *ngIf="blikHistoryLoading()" class="px-4 py-6 text-center text-sm text-orange-700">Ładowanie...</div>
+        <div *ngIf="!blikHistoryLoading() && blikTransactions().length === 0" class="px-4 py-6 text-center text-sm text-orange-700">
+          Brak płatności BLIK.
+        </div>
+        <div *ngFor="let tx of blikTransactions()" class="px-4 py-3 border-b border-orange-100 last:border-0 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm font-bold text-slate-900 truncate">{{ tx.merchant_name || 'Płatność BLIK' }}</p>
+            <p class="text-xs text-orange-700">{{ tx.created_at | date:'dd.MM.yyyy HH:mm' }}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-sm font-black text-slate-900">-{{ tx.amount }} {{ tx.currency }}</p>
+            <p class="text-xs font-bold"
+               [ngClass]="tx.status === 'COMPLETED' ? 'text-emerald-600' : tx.status === 'PENDING' ? 'text-amber-600' : 'text-rose-600'">
+              {{ blikStatusLabel(tx.status) }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab() === 'transfer'" class="rounded-[2rem] p-6 bg-white/95 border-4 border-white shadow-xl">
+      <h2 class="text-lg font-black text-violet-900 mb-4">Przelew</h2>
+
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <button type="button" (click)="transferTab.set('iban')"
+                class="rounded-xl py-2 font-black text-sm border-2"
+                [ngClass]="transferTab() === 'iban'
+                  ? 'bg-violet-500 border-violet-500 text-white'
+                  : 'border-violet-200 text-violet-700'">
+          Na IBAN
+        </button>
+        <button type="button" (click)="transferTab.set('phone')"
+                class="rounded-xl py-2 font-black text-sm border-2"
+                [ngClass]="transferTab() === 'phone'
+                  ? 'bg-emerald-500 border-emerald-500 text-white'
+                  : 'border-emerald-200 text-emerald-700'">
+          Na telefon
+        </button>
+      </div>
+
+      <form *ngIf="transferTab() === 'iban'" [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="space-y-3">
+        <input class="rounded-2xl px-4 py-3 w-full bg-violet-50 border-2 border-violet-200 outline-none focus:border-violet-500 font-mono text-sm"
+               formControlName="recipient_iban" placeholder="IBAN odbiorcy">
+        <input class="rounded-2xl px-4 py-3 w-full bg-violet-50 border-2 border-violet-200 outline-none focus:border-violet-500"
+               formControlName="recipient_name" placeholder="Nazwa odbiorcy">
+        <input class="rounded-2xl px-4 py-3 w-full bg-violet-50 border-2 border-violet-200 outline-none focus:border-violet-500"
+               formControlName="amount" type="number" step="0.01" placeholder="Kwota">
+        <input class="rounded-2xl px-4 py-3 w-full bg-violet-50 border-2 border-violet-200 outline-none focus:border-violet-500"
+               formControlName="title" placeholder="Tytuł">
+        <button type="submit" class="rounded-2xl py-3 w-full bg-gradient-to-r from-fuchsia-500 to-violet-500 text-white font-black disabled:opacity-50"
+                [disabled]="transferForm.invalid || !account()">
+          Wyślij do akceptacji
+        </button>
+      </form>
+
+      <div *ngIf="transferTab() === 'phone'">
+        <div *ngIf="contacts().length > 0" class="mb-3 max-h-28 overflow-y-auto rounded-xl border-2 border-emerald-200 divide-y">
+          <button type="button" *ngFor="let c of contacts()" (click)="selectContact(c)"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-50">
+            <span class="text-sm font-bold text-emerald-900">{{ c.name }}</span>
+            <span class="text-xs text-emerald-600 font-mono">{{ c.phone }}</span>
+          </button>
+        </div>
+        <form [formGroup]="p2pForm" (ngSubmit)="submitP2pTransfer()" class="space-y-3">
+          <div class="flex gap-2">
+            <input class="rounded-2xl px-4 py-3 flex-1 bg-emerald-50 border-2 border-emerald-200 font-mono text-sm"
+                   formControlName="recipient_phone" type="tel" placeholder="Numer telefonu">
+            <button type="button" (click)="checkNumber()" [disabled]="lookupLoading()"
+                    class="rounded-2xl px-3 bg-emerald-200 text-emerald-900 font-black text-sm">
+              {{ lookupLoading() ? '...' : 'Sprawdź' }}
+            </button>
+          </div>
+          <div *ngIf="lookupResult() as lr" class="text-xs font-bold rounded-xl px-3 py-2"
+               [ngClass]="lr.found ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+            {{ lr.found ? '✓ Numer w KLIK' : 'Numer nie w KLIK' }}
+          </div>
+          <input class="rounded-2xl px-4 py-3 w-full bg-emerald-50 border-2 border-emerald-200"
+                 formControlName="recipient_name" placeholder="Imię odbiorcy (opcjonalnie)">
+          <input class="rounded-2xl px-4 py-3 w-full bg-emerald-50 border-2 border-emerald-200"
+                 formControlName="amount" type="number" step="0.01" placeholder="Kwota">
+          <input class="rounded-2xl px-4 py-3 w-full bg-emerald-50 border-2 border-emerald-200"
+                 formControlName="title" placeholder="Tytuł">
+          <label class="flex items-center gap-2 text-sm text-emerald-800 font-semibold">
+            <input formControlName="save_contact" type="checkbox" class="w-4 h-4">
+            Zapisz w kontaktach
+          </label>
+          <button type="submit" class="rounded-2xl py-3 w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black disabled:opacity-50"
+                  [disabled]="p2pForm.invalid || p2pLoading() || !account()">
+            {{ p2pLoading() ? 'Wysyłanie...' : 'Wyślij do akceptacji' }}
+          </button>
+        </form>
+      </div>
+    </section>
+
+  </div>
+</div>

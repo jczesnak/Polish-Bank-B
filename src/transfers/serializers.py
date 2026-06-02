@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transfer
+from .models import ApprovalRequest, Transfer
 
 
 class TransferSerializer(serializers.ModelSerializer):
@@ -21,6 +21,49 @@ class TransferSerializer(serializers.ModelSerializer):
             'status', 'status_display', 'created_at', 'processed_at',
         ]
         read_only_fields = ['id', 'status', 'created_at', 'processed_at']
+
+
+class ApprovalRequestSerializer(serializers.ModelSerializer):
+    request_type_display = serializers.CharField(source='get_request_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    junior_name = serializers.SerializerMethodField(read_only=True)
+    account_iban = serializers.CharField(source='account.iban', read_only=True)
+    amount = serializers.SerializerMethodField(read_only=True)
+    target = serializers.SerializerMethodField(read_only=True)
+    transfer_status = serializers.CharField(source='transfer.status', read_only=True)
+    card_transaction_status = serializers.CharField(source='card_transaction.status', read_only=True)
+    blik_transaction_status = serializers.CharField(source='blik_transaction.status', read_only=True)
+
+    def get_junior_name(self, obj):
+        return f'{obj.junior.first_name} {obj.junior.last_name}'.strip()
+
+    def get_amount(self, obj):
+        if obj.transfer_id:
+            return str(obj.transfer.amount)
+        if obj.card_transaction_id:
+            return str(obj.card_transaction.amount)
+        if obj.blik_transaction_id:
+            return str(obj.blik_transaction.amount)
+        return '0.00'
+
+    def get_target(self, obj):
+        if obj.transfer_id:
+            return obj.transfer.recipient_name or obj.transfer.recipient_iban
+        if obj.card_transaction_id:
+            return obj.card_transaction.merchant_name
+        if obj.blik_transaction_id:
+            return obj.blik_transaction.merchant_name or 'Płatność BLIK'
+        return ''
+
+    class Meta:
+        model = ApprovalRequest
+        fields = [
+            'id', 'request_type', 'request_type_display', 'status', 'status_display',
+            'junior', 'junior_name', 'account', 'account_iban', 'transfer',
+            'card_transaction', 'blik_transaction', 'amount', 'target', 'transfer_status',
+            'card_transaction_status', 'blik_transaction_status', 'created_at', 'decided_at',
+        ]
+        read_only_fields = fields
 
 
 class CreateTransferSerializer(serializers.ModelSerializer):

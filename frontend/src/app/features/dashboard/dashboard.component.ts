@@ -1,11 +1,14 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
 import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { RealtimeService } from '../../core/services/realtime.service';
+import { ApprovalRequest, JuniorService } from '../../core/services/junior.service';
 
 export interface BlikTransaction {
   id: string;
@@ -42,11 +45,15 @@ export interface Transfer {
   imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe],
   templateUrl: './dashboard.component.html',
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   public auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private notifSvc = inject(NotificationService);
+  private realtime = inject(RealtimeService);
+  private junior = inject(JuniorService);
+  private realtimeSub?: { unsubscribe(): void };
+  private blikPendingPoller: ReturnType<typeof setInterval> | null = null;
 
   user = this.auth.user;
   accounts = signal<Account[]>([]);
@@ -71,6 +78,9 @@ export class DashboardComponent implements OnInit {
   blikLoading = signal(false);
   blikError = signal('');
   blikConfirmed = signal(false);
+  pendingBlikAuth = signal<BlikTransaction | null>(null);
+  blikAuthLoading = signal(false);
+  parentApprovals = signal<ApprovalRequest[]>([]);
 
   historyFilter = signal<'all' | 'out' | 'in'>('all');
 
@@ -168,6 +178,14 @@ export class DashboardComponent implements OnInit {
     return d.length > 0 ? Math.max(...d.map(p => p.balance)) : 0;
   });
 
+  parentPendingApprovals = computed(() =>
+    this.parentApprovals().filter((a) => a.status === 'PENDING'),
+  );
+
+  parentBlikPendingCount = computed(() =>
+    this.parentPendingApprovals().filter((a) => a.request_type === 'BLIK_PAYMENT').length,
+  );
+
   transferForm = this.fb.group({
     sender_account: [''],
     amount: ['', [Validators.required, Validators.min(0.01)]],
@@ -180,6 +198,95 @@ export class DashboardComponent implements OnInit {
     this.loadAccounts();
     this.loadTransfers();
     this.loadBlikTransactions();
+    this.loadPendingBlik();
+    if (this.user()?.role !== 'JUNIOR') {
+      this.loadParentApprovals();
+    }
+    this.realtime.connect();
+    this.realtimeSub = this.realtime.events$.subscribe((event) => {
+      if (event.event === 'blik.pending') {
+        this.loadPendingBlik();
+        this.showBlikModal.set(true);
+        this.notifSvc.add(
+          `Autoryzuj płatność BLIK: ${event.payload.amount} PLN — ${event.payload.merchant_name}`,
+          'out',
+        );
+      }
+      if (event.event === 'approval.created' && this.user()?.role !== 'JUNIOR') {
+        this.loadParentApprovals();
+      }
+    });
+    this.blikPendingPoller = setInterval(() => {
+      this.loadPendingBlik(false);
+      if (this.user()?.role !== 'JUNIOR') this.loadParentApprovals();
+    }, 4000);
+  }
+
+  ngOnDestroy() {
+    if (this.blikInterval) clearInterval(this.blikInterval);
+    if (this.blikPendingPoller) clearInterval(this.blikPendingPoller);
+    this.realtimeSub?.unsubscribe();
+  }
+
+  loadParentApprovals() {
+    this.junior.listApprovals().subscribe({
+      next: (approvals) => this.parentApprovals.set(approvals),
+      error: () => {},
+    });
+  }
+
+  loadPendingBlik(showError = true) {
+    this.http.get<BlikTransaction[]>('/api/blik/pending/').pipe(catchError(() => of([]))).subscribe({
+      next: (pending) => {
+        this.pendingBlikAuth.set(pending[0] || null);
+        if (pending.length > 0 && !this.showBlikModal()) {
+          this.showBlikModal.set(true);
+        }
+      },
+      error: () => {
+        if (showError) this.blikError.set('Nie udało się pobrać oczekujących autoryzacji BLIK.');
+      },
+    });
+  }
+
+  confirmPendingBlik() {
+    const pending = this.pendingBlikAuth();
+    if (!pending || this.blikAuthLoading()) return;
+    this.blikAuthLoading.set(true);
+    this.blikError.set('');
+    this.http.post<BlikTransaction>(`/api/blik/pending/${pending.id}/confirm/`, {}).subscribe({
+      next: () => {
+        this.blikAuthLoading.set(false);
+        this.pendingBlikAuth.set(null);
+        this.notifSvc.add('Płatność BLIK zatwierdzona.', 'out');
+        this.loadBlikTransactions();
+        this.loadAccounts();
+      },
+      error: (err) => {
+        this.blikAuthLoading.set(false);
+        this.blikError.set(err?.error?.detail || 'Nie udało się zatwierdzić płatności BLIK.');
+      },
+    });
+  }
+
+  rejectPendingBlik() {
+    const pending = this.pendingBlikAuth();
+    if (!pending || this.blikAuthLoading()) return;
+    this.blikAuthLoading.set(true);
+    this.blikError.set('');
+    this.http.post<BlikTransaction>(`/api/blik/pending/${pending.id}/reject/`, {}).subscribe({
+      next: () => {
+        this.blikAuthLoading.set(false);
+        this.pendingBlikAuth.set(null);
+        this.notifSvc.add('Płatność BLIK odrzucona.', 'out');
+        this.loadBlikTransactions();
+        this.loadAccounts();
+      },
+      error: (err) => {
+        this.blikAuthLoading.set(false);
+        this.blikError.set(err?.error?.detail || 'Nie udało się odrzucić płatności BLIK.');
+      },
+    });
   }
 
   loadBlikTransactions() {
@@ -249,6 +356,7 @@ export class DashboardComponent implements OnInit {
     this.blikCode.set(null);
     this.blikError.set('');
     this.blikConfirmed.set(false);
+    this.loadPendingBlik(false);
   }
 
   closeBlikModal() {
@@ -259,6 +367,7 @@ export class DashboardComponent implements OnInit {
     this.blikError.set('');
     this.loadBlikTransactions();
     this.loadAccounts();
+    this.loadPendingBlik(false);
   }
 
   generateBlik() {

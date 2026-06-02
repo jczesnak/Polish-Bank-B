@@ -7,3 +7,6 @@ drf-spectacular==0.27.2
 python-decouple==3.8
 gunicorn==21.2.0
 requests==2.32.3
+channels
+channels-redis
+daphne

@@ -56,7 +56,7 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'pesel']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'pesel', 'role']
         read_only_fields = ['id']
 
 
@@ -69,11 +69,52 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
 class AccountSerializer(serializers.ModelSerializer):
     available_balance = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     account_type_display = serializers.CharField(source='get_account_type_display', read_only=True)
+    parent_account_iban = serializers.CharField(source='parent_account.iban', read_only=True)
+    owner_name = serializers.SerializerMethodField(read_only=True)
+
+    def get_owner_name(self, obj):
+        return f'{obj.user.first_name} {obj.user.last_name}'.strip()
 
     class Meta:
         model = Account
         fields = [
             'id', 'iban', 'balance', 'blocked_funds', 'available_balance',
-            'currency', 'account_type', 'account_type_display', 'created_at',
+            'currency', 'account_type', 'account_type_display', 'parent_account',
+            'parent_account_iban', 'owner_name', 'created_at',
         ]
         read_only_fields = ['id', 'iban', 'created_at']
+
+
+class JuniorCreateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    pesel = serializers.CharField(max_length=11)
+    phone_number = serializers.CharField(max_length=9, required=False, allow_blank=True, default='')
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+    parent_account_id = serializers.UUIDField()
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError({'password_confirm': 'Hasła nie są identyczne.'})
+        if User.objects.filter(email=data['email']).exists():
+            raise serializers.ValidationError({'email': 'Użytkownik z tym adresem email już istnieje.'})
+        if User.objects.filter(pesel=data['pesel']).exists():
+            raise serializers.ValidationError({'pesel': 'Użytkownik z tym PESEL już istnieje.'})
+        if not data['pesel'].isdigit() or len(data['pesel']) != 11:
+            raise serializers.ValidationError({'pesel': 'PESEL musi składać się z 11 cyfr.'})
+
+        request = self.context['request']
+        try:
+            parent_account = Account.objects.get(
+                pk=data['parent_account_id'],
+                user=request.user,
+                account_type__in=[Account.AccountType.CHECKING, Account.AccountType.SAVINGS],
+            )
+        except Account.DoesNotExist as exc:
+            raise serializers.ValidationError(
+                {'parent_account_id': 'Konto rodzica nie istnieje albo nie należy do Ciebie.'}
+            ) from exc
+        data['parent_account'] = parent_account
+        return data

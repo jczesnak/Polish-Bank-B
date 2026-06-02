@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
-from transfers.models import Transfer
+from transfers.models import ApprovalRequest, Transfer
+from transfers.notifications import send_user_event
 from .models import BlikCode, BlikTransaction, PhoneAlias, P2pContact
 from .serializers import (
     BlikGenerateSerializer,
@@ -23,6 +24,7 @@ from .serializers import (
     P2pContactSerializer,
 )
 from .services import KlikService, KlikError
+from .payments import accept_blik_transaction, reject_blik_transaction, BlikPaymentError
 
 
 def normalize_phone(raw: str) -> str:
@@ -116,50 +118,68 @@ class BlikWebhookAuthorizeView(APIView):
                 self._safe_reject(data['transaction_id'], 'INSUFFICIENT_FUNDS')
                 return Response({'received': True, 'will_prompt_user': False})
 
-            # Hold środków przed potwierdzeniem
             account.blocked_funds += amount
             account.save(update_fields=['blocked_funds'])
 
-            transaction = BlikTransaction.objects.create(
-                klik_transaction_id=data['transaction_id'],
-                account=account,
-                user=blik_code.user,
-                amount=amount,
-                currency=data['currency'],
-                merchant_name=data.get('merchant_name', ''),
-            )
-            self._finalize_code(blik_code)
+            if account.account_type == Account.AccountType.JUNIOR:
+                if not account.parent_account_id:
+                    account.blocked_funds -= amount
+                    account.save(update_fields=['blocked_funds'])
+                    self._finalize_code(blik_code)
+                    self._safe_reject(data['transaction_id'], 'OTHER')
+                    return Response(
+                        {'detail': 'Konto Junior nie ma przypisanego konta rodzica.'},
+                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    )
 
-        # Potwierdzenie do KLIK (poza atomic — to call sieciowy)
-        try:
-            KlikService().confirm_payment(
-                transaction_id=str(data['transaction_id']),
-                decision='ACCEPTED',
-            )
-        except KlikError as exc:
-            with db_transaction.atomic():
-                account = Account.objects.select_for_update().get(pk=account.id)
-                account.blocked_funds -= amount
-                account.save(update_fields=['blocked_funds'])
-                transaction.status = BlikTransaction.Status.REJECTED
-                transaction.reject_reason = BlikTransaction.RejectReason.OTHER
-                transaction.completed_at = timezone.now()
-                transaction.save(update_fields=['status', 'reject_reason', 'completed_at'])
-            return Response(
-                {'detail': f'Błąd potwierdzenia w systemie KLIK: {exc.message}', 'code': exc.code},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+                transaction = BlikTransaction.objects.create(
+                    klik_transaction_id=data['transaction_id'],
+                    account=account,
+                    user=blik_code.user,
+                    amount=amount,
+                    currency=data['currency'],
+                    merchant_name=data.get('merchant_name', ''),
+                    status=BlikTransaction.Status.PENDING,
+                )
+                self._finalize_code(blik_code)
 
-        # KLIK potwierdził COMPLETED — finalizujemy: hold → faktyczne obciążenie.
-        with db_transaction.atomic():
-            account = Account.objects.select_for_update().get(pk=account.id)
-            account.blocked_funds -= amount
-            account.balance -= amount
-            account.save(update_fields=['blocked_funds', 'balance'])
-            transaction.status = BlikTransaction.Status.COMPLETED
-            transaction.completed_at = timezone.now()
-            transaction.save(update_fields=['status', 'completed_at'])
+                parent = account.parent_account.user
+                approval = ApprovalRequest.objects.create(
+                    request_type=ApprovalRequest.RequestType.BLIK_PAYMENT,
+                    junior=blik_code.user,
+                    parent=parent,
+                    account=account,
+                    blik_transaction=transaction,
+                )
 
+            else:
+                transaction = BlikTransaction.objects.create(
+                    klik_transaction_id=data['transaction_id'],
+                    account=account,
+                    user=blik_code.user,
+                    amount=amount,
+                    currency=data['currency'],
+                    merchant_name=data.get('merchant_name', ''),
+                    status=BlikTransaction.Status.PENDING,
+                )
+                self._finalize_code(blik_code)
+                approval = None
+
+        if account.account_type == Account.AccountType.JUNIOR:
+            send_user_event(parent.id, 'approval.created', {
+                'approval_id': str(approval.id),
+                'type': approval.request_type,
+                'junior_name': f'{blik_code.user.first_name} {blik_code.user.last_name}'.strip(),
+                'amount': str(amount),
+                'target': data.get('merchant_name') or 'Płatność BLIK',
+            })
+            return Response({'received': True, 'will_prompt_user': True})
+
+        send_user_event(blik_code.user_id, 'blik.pending', {
+            'transaction_id': str(transaction.id),
+            'amount': str(amount),
+            'merchant_name': data.get('merchant_name') or 'Płatność BLIK',
+        })
         return Response({'received': True, 'will_prompt_user': True})
 
     @staticmethod
@@ -209,6 +229,48 @@ class BlikTransactionListView(generics.ListAPIView):
 
     def get_queryset(self):
         return BlikTransaction.objects.filter(user=self.request.user)
+
+
+class BlikPendingListView(generics.ListAPIView):
+    """Oczekujące autoryzacje BLIK zalogowanego klienta (konto dorosłe)."""
+    serializer_class = BlikTransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return BlikTransaction.objects.filter(
+            user=self.request.user,
+            status=BlikTransaction.Status.PENDING,
+        )
+
+
+class BlikAuthorizationDecisionView(APIView):
+    """Akceptacja lub odrzucenie oczekującej płatności BLIK przez klienta."""
+    permission_classes = [IsAuthenticated]
+
+    @db_transaction.atomic
+    def post(self, request, pk, decision):
+        try:
+            blik_tx = BlikTransaction.objects.select_for_update().get(
+                pk=pk, user=request.user, status=BlikTransaction.Status.PENDING,
+            )
+        except BlikTransaction.DoesNotExist:
+            return Response({'detail': 'Autoryzacja BLIK nie istnieje lub wygasła.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if blik_tx.account.account_type == Account.AccountType.JUNIOR:
+            return Response(
+                {'detail': 'Płatność BLIK konta Junior wymaga zgody rodzica.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            if decision == 'reject':
+                reject_blik_transaction(blik_tx)
+            else:
+                accept_blik_transaction(blik_tx)
+        except BlikPaymentError as exc:
+            return Response({'detail': exc.message}, status=exc.http_status)
+
+        return Response(BlikTransactionSerializer(blik_tx).data)
 
 
 # --- P2P (przelew na telefon) --------------------------------------------
@@ -362,7 +424,69 @@ class P2PTransferView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        # 2) Realizacja przelewu po stronie banku
+        display_name = recipient_name or phone
+        is_junior = sender.account_type == Account.AccountType.JUNIOR
+
+        if is_junior:
+            with db_transaction.atomic():
+                sender = Account.objects.select_for_update().get(pk=sender.id)
+                if sender.available_balance < amount:
+                    return Response(
+                        {'amount': 'Niewystarczające środki na rachunku.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                transfer = Transfer.objects.create(
+                    sender_account=sender,
+                    recipient_iban=recipient_iban,
+                    recipient_name=display_name,
+                    amount=amount,
+                    title=data['title'],
+                    system_route=Transfer.TransferSystem.KLIK,
+                    status=Transfer.Status.PENDING_APPROVAL,
+                    processed_at=None,
+                )
+                parent = sender.parent_account.user
+                approval = ApprovalRequest.objects.create(
+                    request_type=ApprovalRequest.RequestType.TRANSFER,
+                    junior=request.user,
+                    parent=parent,
+                    account=sender,
+                    transfer=transfer,
+                )
+
+            send_user_event(parent.id, 'approval.created', {
+                'approval_id': str(approval.id),
+                'type': approval.request_type,
+                'junior_name': f'{request.user.first_name} {request.user.last_name}'.strip(),
+                'amount': str(transfer.amount),
+                'target': f'{display_name} ({phone})',
+            })
+
+            saved_contact = False
+            if data.get('save_contact') and recipient_name:
+                _, created = P2pContact.objects.update_or_create(
+                    user=request.user,
+                    phone=phone,
+                    defaults={'name': recipient_name},
+                )
+                saved_contact = created
+
+            return Response({
+                'message': 'Przelew na telefon oczekuje na zgodę rodzica.',
+                'transfer_id': transfer.id,
+                'approval_id': approval.id,
+                'recipient_phone': phone,
+                'recipient_name': display_name,
+                'recipient_iban': recipient_iban,
+                'recipient_bank': routing.get('bank_code'),
+                'amount': str(amount),
+                'system_route': Transfer.TransferSystem.KLIK,
+                'status': transfer.status,
+                'contact_saved': saved_contact,
+            }, status=status.HTTP_202_ACCEPTED)
+
+        # 2) Realizacja przelewu po stronie banku (konto dorosłego)
         with db_transaction.atomic():
             sender = Account.objects.select_for_update().get(pk=sender.id)
             if sender.available_balance < amount:
