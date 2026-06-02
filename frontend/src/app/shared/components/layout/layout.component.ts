@@ -21,6 +21,8 @@ export class LayoutComponent {
     const path = window.location.pathname;
     if (path.includes('settings')) return 'Ustawienia';
     if (path.includes('dashboard')) return 'Pulpit';
+    if (path.includes('p2p')) return 'Przelew na telefon';
+    if (path.includes('transfer')) return 'Przelew';
     return 'TotalBank';
   }
 
