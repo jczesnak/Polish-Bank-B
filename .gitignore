@@ -41,3 +41,4 @@ dist/
 Thumbs.db
 
 .claude
+.cursor

@@ -40,6 +40,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/transfer/transfer.component').then((m) => m.TransferComponent),
       },
+      {
+        path: 'p2p',
+        loadComponent: () =>
+          import('./features/p2p/p2p.component').then((m) => m.P2pComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

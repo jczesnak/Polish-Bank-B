@@ -8,6 +8,7 @@ class Transfer(models.Model):
         INTERNAL = 'INTERNAL', 'Wewnętrzny'
         ELIXIR = 'ELIXIR', 'Elixir'
         EXPRESS_ELIXIR = 'EXPRESS_ELIXIR', 'Express Elixir'
+        KLIK = 'KLIK', 'KLIK'
         SORBNET = 'SORBNET', 'Sorbnet'
 
     class Status(models.TextChoices):

@@ -57,3 +57,52 @@ class BlikTransaction(models.Model):
 
     def __str__(self):
         return f"BLIK TX {self.klik_transaction_id} {self.amount} PLN [{self.status}]"
+
+
+class PhoneAlias(models.Model):
+    """Alias P2P (przelew na telefon) zarejestrowany przez ten bank w KLIK.
+
+    Lokalny rejestr aliasów należących do klientów tego banku. KLIK trzyma
+    globalny rejestr telefon → bank/IBAN, ale nie udostępnia listy per bank,
+    więc cache'ujemy własne aliasy tutaj (m.in. po to, by klient mógł je
+    wyrejestrować).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='phone_aliases')
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='phone_aliases')
+    phone = models.CharField(max_length=16, unique=True)
+    klik_alias_id = models.UUIDField(null=True, blank=True)
+    zone = models.CharField(max_length=2, default='PL')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'blik_phone_aliases'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"P2P {self.phone} → {self.account.iban} ({self.user.email})"
+
+
+class P2pContact(models.Model):
+    """Zapisany kontakt P2P (przelew na telefon) klienta tego banku.
+
+    Pozwala wysłać przelew na telefon do zapisanej osoby bez ponownego
+    wpisywania numeru. Kontakt jest prywatny dla właściciela (user).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='p2p_contacts')
+    name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'blik_p2p_contacts'
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'phone'], name='uniq_p2p_contact_user_phone'),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.phone}) — {self.user.email}"

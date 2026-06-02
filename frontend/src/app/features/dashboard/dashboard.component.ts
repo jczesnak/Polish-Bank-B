@@ -1,10 +1,23 @@
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
 import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
+
+export interface BlikTransaction {
+  id: string;
+  klik_transaction_id: string;
+  amount: string;
+  currency: string;
+  merchant_name: string;
+  status: string;
+  reject_reason: string;
+  created_at: string;
+  completed_at: string | null;
+}
 
 export interface Account { id: string; iban: string; balance: string; blocked_funds: string; available_balance: string; currency: string; account_type: string; account_type_display: string; }
 
@@ -26,7 +39,7 @@ export interface Transfer {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [ReactiveFormsModule, DecimalPipe, NgClass, NgIf, NgFor, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -38,8 +51,10 @@ export class DashboardComponent implements OnInit {
   user = this.auth.user;
   accounts = signal<Account[]>([]);
   transfers = signal<Transfer[]>([]);
+  blikTransactions = signal<BlikTransaction[]>([]);
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
+  loadingBlik = signal(true);
   private previousBalance = -1;
 
   // Stan Modali
@@ -164,6 +179,18 @@ export class DashboardComponent implements OnInit {
   ngOnInit() {
     this.loadAccounts();
     this.loadTransfers();
+    this.loadBlikTransactions();
+  }
+
+  loadBlikTransactions() {
+    this.loadingBlik.set(true);
+    this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))).subscribe({
+      next: (txs) => {
+        this.blikTransactions.set(txs);
+        this.loadingBlik.set(false);
+      },
+      error: () => this.loadingBlik.set(false),
+    });
   }
 
   private loadAccounts() {
@@ -230,6 +257,8 @@ export class DashboardComponent implements OnInit {
     this.blikCode.set(null);
     this.blikConfirmed.set(false);
     this.blikError.set('');
+    this.loadBlikTransactions();
+    this.loadAccounts();
   }
 
   generateBlik() {
