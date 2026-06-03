@@ -2,10 +2,11 @@ import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
+import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe } from '@angular/common';
 import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { CardService } from '../../core/services/card.service';
 
 export interface BlikTransaction {
   id: string;
@@ -39,7 +40,7 @@ export interface Transfer {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -47,11 +48,20 @@ export class DashboardComponent implements OnInit {
   public auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private notifSvc = inject(NotificationService);
+  private cardService = inject(CardService);
 
   user = this.auth.user;
   accounts = signal<Account[]>([]);
   transfers = signal<Transfer[]>([]);
   blikTransactions = signal<BlikTransaction[]>([]);
+  
+  // Stan Kart
+  cards = signal<any[]>([]);
+  loadingCards = signal(false);
+
+  showDetailsModal = signal(false);
+ selectedCardDetails = signal<any>(null);
+
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
   loadingBlik = signal(true);
@@ -180,8 +190,56 @@ export class DashboardComponent implements OnInit {
     this.loadAccounts();
     this.loadTransfers();
     this.loadBlikTransactions();
+    this.loadCards();
   }
 
+  // --- Obsługa Kart ---
+  loadCards() {
+    this.loadingCards.set(true);
+    this.cardService.getCards().subscribe({
+      next: (res) => {
+        this.cards.set(res);
+        this.loadingCards.set(false);
+      },
+      error: () => this.loadingCards.set(false)
+    });
+  }
+
+openDetails(card: any) {
+    this.cardService.getCardDetails(card.id).subscribe({
+      next: (res) => {
+        this.selectedCardDetails.set({
+          ...res,
+          id: card.id,
+          name: `${this.user()?.first_name} ${this.user()?.last_name}`
+        });
+        this.showDetailsModal.set(true);
+      },
+      error: () => this.notifSvc.add('Błąd pobierania danych karty', 'out')
+    });
+  }
+  onOrderCard() {
+    this.cardService.orderCard().subscribe({
+      next: () => {
+        this.notifSvc.add('Karta została zamówiona!', 'in');
+        this.loadCards();
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd zamawiania karty', 'out')
+    });
+  }
+
+  onBlockCard(cardId: number) {
+    if(!confirm('Czy na pewno chcesz zablokować tę kartę?')) return;
+    this.cardService.blockCard(cardId).subscribe({
+      next: () => {
+        this.notifSvc.add('Karta została zablokowana', 'out');
+        this.loadCards();
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd blokowania', 'out')
+    });
+  }
+
+  // --- Reszta logiki (niezmieniona) ---
   loadBlikTransactions() {
     this.loadingBlik.set(true);
     this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))).subscribe({
@@ -233,7 +291,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  // --- Obsługa Modali ---
   openTransferModal() {
     this.showTransferModal.set(true);
     this.transferError.set('');

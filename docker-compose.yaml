@@ -33,13 +33,15 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/app/src
+    networks:
+      - default
+      - cards-backend  # Podpięcie do sieci systemu kart
 
   frontend:
     image: node:20-alpine
     working_dir: /app
     volumes:
       - ./frontend:/app
-      
       - /app/node_modules
     ports:
       - "4200:4200"
@@ -50,3 +52,8 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  default:
+  cards-backend:
+    external: true
