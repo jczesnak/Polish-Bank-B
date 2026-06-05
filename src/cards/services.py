@@ -1,109 +1,210 @@
-import grpc
 import time
 import json
 import hmac
 import hashlib
+import requests
 from django.conf import settings
-from . import card_pb2
-from . import card_pb2_grpc
 from .models import PaymentCard
 
 class CardIntegrationService:
     def __init__(self):
-        self.channel = grpc.insecure_channel('card-provider:50051')
-        self.stub = card_pb2_grpc.CardProviderStub(self.channel)
+        self.base_url = getattr(settings, 'INTEGRATIONS_CARDS_URL', 'http://cards_gateway_app:8000')
+        self.api_key = getattr(settings, 'CARDS_API_KEY', 'bank-key-pl-b')
+        self.api_secret = getattr(settings, 'CARDS_API_SECRET', 'secret-pl-b-hmac')
 
-    def order_card(self, account):
-        # 1. Przygotowanie słownika z danymi do podpisu
-        body = {
-            "user_id": str(account.user.id),
-            "account_id": str(account.id),
-            "card_type": "VIRTUAL",
-            "initial_balance": 0.0,
-        }
-
+    def _sign_request(self, body: dict) -> tuple[str, str]:
         timestamp = str(int(time.time()))
-        
-   
         body_json = json.dumps(body, separators=(',', ':'), sort_keys=True)
         payload_to_sign = timestamp + body_json
         
-        api_secret = settings.CARDS_API_SECRET.encode('utf-8')
+        signature = hmac.new(
+            self.api_secret.encode('utf-8'),
+            payload_to_sign.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
         
+        return signature, timestamp
 
-        signature = hmac.new(api_secret, payload_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+    def _get_headers(self, body: dict) -> dict:
+        signature, timestamp = self._sign_request(body)
+        return {
+            "Content-Type": "application/json",
+            "X-API-Key": self.api_key,
+            "X-Signature": signature,
+            "X-Timestamp": timestamp
+        }
 
-        # 4. Budowanie żądania gRPC
-        request = card_pb2.CreateCardRequest(
-            user_id=body["user_id"],
-            account_id=body["account_id"],
-            card_type=body["card_type"],
-            initial_balance=body["initial_balance"],
-            api_key=settings.CARDS_API_KEY,
-            signature=signature,
-            timestamp=timestamp
-        )
+    def order_card(self, account, card_type="VIRTUAL", initial_balance=0.0):
+        body = {
+            "user_id": str(account.user.id),
+            "account_id": str(account.id),
+            "card_type": card_type,
+            "initial_balance": initial_balance,
+        }
+        
+        headers = self._get_headers(body)
+        url = f"{self.base_url}/api/v1/cards/issue"
         
         try:
-            response = self.stub.CreateCard(request)
+            response = requests.post(url, json=body, headers=headers, timeout=10)
             
-            card = PaymentCard.objects.create(
-                account=account,
-                card_number=response.full_pan,
-                external_card_id=response.card_token,
-                masked_number=response.masked_pan
-            )
-            
-            return {
-                "success": True,
-                "card": card,
-                "masked_number": response.masked_pan,
-                "expiry_date": f"{response.expiry_month:02d}/{response.expiry_year}",
-                "cvv": response.cvv
-            }
-        except grpc.RpcError as e:
+            if response.status_code == 200:
+                data = response.json()
+                card = PaymentCard.objects.create(
+                    account=account,
+                    card_number=data.get("full_pan"),
+                    external_card_id=data.get("card_token"),
+                    masked_number=data.get("masked_pan")
+                )
+                
+                return {
+                    "success": True,
+                    "card": card,
+                    "masked_number": data.get("masked_pan"),
+                    "expiry_date": f"{data.get('expiry_month', 0):02d}/{data.get('expiry_year', 0)}",
+                    "cvv": data.get("cvv")
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_code": str(response.status_code),
+                    "details": response.text
+                }
+        except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error_code": str(e.code()),
-                "details": e.details()
+                "error_code": "CONNECTION_ERROR",
+                "details": str(e)
             }
+
+    def unblock_card(self, card_token, reason="Odblokowana przez użytkownika"):
+        body = {
+            "status": "ACTIVE",
+            "reason": reason
+        }
         
+        headers = self._get_headers(body)
+        url = f"{self.base_url}/api/v1/cards/{card_token}/status"
+        
+        try:
+            response = requests.patch(url, json=body, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": "Status updated successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_code": str(response.status_code),
+                    "details": response.text
+                }
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error_code": "CONNECTION_ERROR",
+                "details": str(e)
+            }
+
     def block_card(self, card_token, reason="Zablokowana przez użytkownika"):
-        """Wysyła sygnał dezaktywacji karty do systemu zewnętrznego."""
-        request = card_pb2.BlockCardRequest(
-            card_token=card_token,
-            reason=reason
-        )
+        body = {
+            "status": "BLOCKED",
+            "reason": reason
+        }
+        
+        headers = self._get_headers(body)
+        url = f"{self.base_url}/api/v1/cards/{card_token}/status"
         
         try:
-            response = self.stub.BlockCard(request)
-            return {
-                "success": response.success,
-                "message": response.message
-            }
-        except grpc.RpcError as e:
+            response = requests.patch(url, json=body, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": "Status updated successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_code": str(response.status_code),
+                    "details": response.text
+                }
+        except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error_code": str(e.code()),
-                "details": e.details()
+                "error_code": "CONNECTION_ERROR",
+                "details": str(e)
             }
-        
 
     def get_card_details(self, card_token):
-        """Pobiera pełne dane karty używając istniejącego RPC GetFullPan."""
-        request = card_pb2.GetCardRequest(card_token=card_token)
+        # Pobieramy dane ogólne z podstawowego endpointu
+        url_status = f"{self.base_url}/api/v1/cards/{card_token}"
+        # Pobieramy pełne dane z administracyjnego endpointu
+        url_full = f"{self.base_url}/api/v1/cards/{card_token}/full-pan"
+        headers_admin = {"X-Admin-Key": "admin-secret-key-2026"}
         
         try:
-            response = self.stub.GetFullPan(request)
-            return {
-                "success": True,
-                "full_pan": response.full_pan,
-                "cvv": response.cvv,
-                "expiry_date": f"{response.expiry_month:02d}/{response.expiry_year}"
-            }
-        except grpc.RpcError as e:
+            res_status = requests.get(url_status, timeout=10)
+            res_full = requests.get(url_full, headers=headers_admin, timeout=10)
+            
+            if res_status.status_code == 200 and res_full.status_code == 200:
+                data_status = res_status.json()
+                data_full = res_full.json()
+                
+                return {
+                    "success": True,
+                    "status": data_status.get("status"),
+                    "card_type": data_status.get("card_type"),
+                    "balance": data_status.get("balance"),
+                    "daily_limit": data_status.get("daily_limit"),
+                    "full_pan": data_full.get("full_pan"),
+                    "masked_pan": data_full.get("masked_pan"),
+                    "cvv": data_full.get("cvv"),
+                    "expiry_date": f"{data_full.get('expiry_month', 0):02d}/{data_full.get('expiry_year', 0)}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_code": f"STATUS: {res_status.status_code}, FULL: {res_full.status_code}",
+                    "details": "Nie udało się pobrać wszystkich danych karty."
+                }
+        except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error_code": str(e.code()),
-                "details": e.details()
+                "error_code": "CONNECTION_ERROR",
+                "details": str(e)
             }
+
+    def activate_card(self, card_token):
+        url = f"{self.base_url}/api/v1/cards/{card_token}/activate"
+        try:
+            response = requests.post(url, json={"activated_by": "customer"}, timeout=10)
+            if response.status_code == 200:
+                return {"success": True, "message": "Karta została aktywowana."}
+            else:
+                return {"success": False, "error_code": str(response.status_code), "details": response.text}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error_code": "CONNECTION_ERROR", "details": str(e)}
+
+    def topup_prepaid(self, card_token, amount):
+        url = f"{self.base_url}/api/v1/cards/{card_token}/topup"
+        try:
+            response = requests.post(url, json={"amount": float(amount), "currency": "PLN"}, timeout=10)
+            if response.status_code == 200:
+                return {"success": True, "new_balance": response.json().get("new_balance")}
+            else:
+                return {"success": False, "error_code": str(response.status_code), "details": response.text}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error_code": "CONNECTION_ERROR", "details": str(e)}
+
+    def dev_simulate_shipping(self, card_token):
+        url = f"{self.base_url}/api/v1/cards/{card_token}/lifecycle"
+        headers = {"X-Admin-Key": "admin-secret-key-2026"}
+        try:
+            res1 = requests.patch(url, headers=headers, json={"new_status": "PRODUCING", "changed_by": "dev"}, timeout=10)
+            res2 = requests.patch(url, headers=headers, json={"new_status": "SHIPPED", "changed_by": "dev"}, timeout=10)
+            if res2.status_code == 200:
+                return {"success": True, "message": "Zasymulowano wysyłkę karty."}
+            else:
+                return {"success": False, "error_code": str(res2.status_code), "details": res2.text}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error_code": "CONNECTION_ERROR", "details": str(e)}
