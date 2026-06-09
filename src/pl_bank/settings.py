@@ -121,3 +121,10 @@ CORS_ALLOW_CREDENTIALS = True
 # Integracja z systemem KLIK (BLIK)
 KLIK_BASE_URL = os.environ.get('INTEGRATIONS_BLIK_URL', 'http://localhost:7005')
 BLIK_API_KEY = os.environ.get('BLIK_API_KEY', '')
+
+# Integracja z procesorem kart (klucze zaczytywane z pliku .env podpiętego w docker-compose)
+CARDS_API_KEY = os.environ.get('CARDS_API_KEY')
+CARDS_API_SECRET = os.environ.get('CARDS_API_SECRET')
+
+if not CARDS_API_KEY or not CARDS_API_SECRET:
+    raise ValueError("Brak kluczy CARDS_API_KEY lub CARDS_API_SECRET w zmiennych środowiskowych!")

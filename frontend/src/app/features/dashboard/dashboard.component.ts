@@ -2,10 +2,11 @@ import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe } from '@angular/common';
+import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe } from '@angular/common';
 import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { CardService } from '../../core/services/card.service';
 
 export interface BlikTransaction {
   id: string;
@@ -39,7 +40,7 @@ export interface Transfer {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -47,11 +48,42 @@ export class DashboardComponent implements OnInit {
   public auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private notifSvc = inject(NotificationService);
+  private cardService = inject(CardService);
 
   user = this.auth.user;
   accounts = signal<Account[]>([]);
   transfers = signal<Transfer[]>([]);
   blikTransactions = signal<BlikTransaction[]>([]);
+  
+  // Stan Kart
+  cards = signal<any[]>([]);
+  loadingCards = signal(false);
+  currentCardIndex = signal(0);
+
+  nextCard() {
+    const len = this.cards().length;
+    if (len <= 1) return;
+    this.currentCardIndex.update(i => (i + 1) % len);
+  }
+
+  prevCard() {
+    const len = this.cards().length;
+    if (len <= 1) return;
+    this.currentCardIndex.update(i => (i - 1 + len) % len);
+  }
+
+  goToCard(index: number) {
+    if (index >= 0 && index < this.cards().length) {
+      this.currentCardIndex.set(index);
+    }
+  }
+
+
+  showDetailsModal = signal(false);
+  selectedCardDetails = signal<any>(null);
+
+  showOrderCardModal = signal(false);
+
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
   loadingBlik = signal(true);
@@ -176,12 +208,148 @@ export class DashboardComponent implements OnInit {
     title: ['', Validators.required],
   });
 
+  orderCardForm = this.fb.group({
+    card_type: ['VIRTUAL', Validators.required],
+    initial_balance: [0, [Validators.min(0)]],
+  });
+
   ngOnInit() {
     this.loadAccounts();
     this.loadTransfers();
     this.loadBlikTransactions();
+    this.loadCards();
   }
 
+  // --- Obsługa Kart ---
+  loadCards() {
+    this.loadingCards.set(true);
+    this.cardService.getCards().subscribe({
+      next: (res) => {
+        this.cards.set(res);
+        if (this.currentCardIndex() >= res.length && res.length > 0) {
+          this.currentCardIndex.set(res.length - 1);
+        } else if (res.length === 0) {
+          this.currentCardIndex.set(0);
+        }
+        this.loadingCards.set(false);
+      },
+      error: () => this.loadingCards.set(false)
+    });
+  }
+
+  openDetails(card: any) {
+    this.cardService.getCardDetails(card.id).subscribe({
+      next: (res) => {
+        this.selectedCardDetails.set({
+          ...res,
+          id: card.id,
+          is_active: card.is_active,
+          name: `${this.user()?.first_name} ${this.user()?.last_name}`
+        });
+        this.showDetailsModal.set(true);
+      },
+      error: () => this.notifSvc.add('Błąd pobierania danych karty', 'out')
+    });
+  }
+
+  openOrderCardModal() {
+    this.orderCardForm.reset({ card_type: 'VIRTUAL', initial_balance: 0 });
+    this.showOrderCardModal.set(true);
+  }
+
+  closeOrderCardModal() {
+    this.showOrderCardModal.set(false);
+  }
+
+  onOrderCard() {
+    if (this.orderCardForm.invalid) return;
+    const vals = this.orderCardForm.value;
+    
+    this.cardService.orderCard(vals.card_type || 'VIRTUAL', vals.initial_balance || 0).subscribe({
+      next: () => {
+        this.notifSvc.add('Karta została zamówiona!', 'in');
+        this.closeOrderCardModal();
+        this.loadCards();
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd zamawiania karty', 'out')
+    });
+  }
+
+  onToggleCardBlock(card: any) {
+    if (card.is_active) {
+      if(!confirm('Czy na pewno chcesz zawiesić tę kartę?')) return;
+      this.cardService.blockCard(card.id).subscribe({
+        next: () => {
+          this.notifSvc.add('Karta została zawieszona', 'out');
+          this.loadCards();
+        },
+        error: (err) => this.notifSvc.add(err.error?.error || 'Błąd zawieszania', 'out')
+      });
+    } else {
+      if(!confirm('Czy na pewno chcesz odblokować tę kartę?')) return;
+      this.cardService.unblockCard(card.id).subscribe({
+        next: () => {
+          this.notifSvc.add('Karta została odblokowana', 'in');
+          this.loadCards();
+        },
+        error: (err) => this.notifSvc.add(err.error?.error || 'Błąd odblokowania', 'out')
+      });
+    }
+  }
+
+  onDeleteCard(cardId: number) {
+    if(!confirm('Czy na pewno chcesz TRWALE usunąć (odpiąć) tę kartę? Tej operacji nie można cofnąć!')) return;
+    this.cardService.deleteCard(cardId).subscribe({
+      next: () => {
+        this.notifSvc.add('Karta została trwale usunięta', 'out');
+        this.loadCards();
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd usuwania karty', 'out')
+    });
+  }
+
+  onActivateCard(card: any) {
+    this.cardService.activateCard(card.id).subscribe({
+      next: () => {
+        this.notifSvc.add('Karta fizyczna została aktywowana!', 'in');
+        this.loadCards();
+        this.openDetails(card); // refresh details
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd aktywacji', 'out')
+    });
+  }
+
+  onTopUpCard(card: any) {
+    const amountStr = prompt('Podaj kwotę doładowania karty Prepaid:');
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      this.notifSvc.add('Nieprawidłowa kwota', 'out');
+      return;
+    }
+    this.cardService.topUpCard(card.id, amount).subscribe({
+      next: (res) => {
+        this.notifSvc.add(`Karta doładowana. Nowe saldo: ${res.new_balance} PLN`, 'in');
+        this.loadCards();
+        this.openDetails(card);
+        this.loadAccounts();
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd doładowania', 'out')
+    });
+  }
+
+  onSimulateShipping(card: any) {
+    this.cardService.simulateShipping(card.id).subscribe({
+      next: () => {
+        this.notifSvc.add('Zasymulowano wysyłkę. Karta ma status SHIPPED.', 'in');
+        this.loadCards();
+        this.openDetails(card);
+      },
+      error: (err) => this.notifSvc.add(err.error?.error || 'Błąd symulacji', 'out')
+    });
+  }
+
+  // --- Reszta logiki (niezmieniona) ---
   loadBlikTransactions() {
     this.loadingBlik.set(true);
     this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))).subscribe({
@@ -233,7 +401,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  // --- Obsługa Modali ---
   openTransferModal() {
     this.showTransferModal.set(true);
     this.transferError.set('');
