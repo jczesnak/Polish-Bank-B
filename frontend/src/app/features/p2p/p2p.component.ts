@@ -67,7 +67,7 @@ export class P2pComponent implements OnInit {
     this.p2p.listContacts().subscribe((contacts) => this.contacts.set(contacts));
   }
 
-  // Wypełnia formularz danymi wybranego kontaktu.
+
   selectContact(contact: P2pContact) {
     this.transferForm.patchValue({
       recipient_phone: contact.phone,
@@ -97,7 +97,7 @@ export class P2pComponent implements OnInit {
     this.p2p.listAliases().subscribe((aliases) => this.aliases.set(aliases));
   }
 
-  // --- Lookup (sprawdzenie numeru) ---
+
   checkNumber() {
     const phone = this.transferForm.value.recipient_phone || '';
     if (!phone) return;
@@ -115,7 +115,7 @@ export class P2pComponent implements OnInit {
     });
   }
 
-  // --- Przelew na telefon ---
+
   submitTransfer() {
     if (this.transferForm.invalid) {
       this.transferForm.markAllAsTouched();
@@ -157,7 +157,7 @@ export class P2pComponent implements OnInit {
       });
   }
 
-  // --- Rejestracja własnego aliasu ---
+
   registerAlias() {
     if (this.aliasForm.invalid) {
       this.aliasForm.markAllAsTouched();

@@ -11,10 +11,12 @@ from .views import (
     CardDetailsView,
     ActivateCardView,
     TopUpCardView,
-    DevSimulateShippingView
+    DevSimulateShippingView,
+    CardTransactionListView
 )
 
 urlpatterns = [
+    path('transactions/', CardTransactionListView.as_view(), name='card-transactions'),
     path('order/', OrderCardView.as_view(), name='order-card'),
     path('my-cards/', UserCardsView.as_view(), name='my-cards'),
     path('authorize', AuthorizeWebhookView.as_view(), name='webhook-authorize'),

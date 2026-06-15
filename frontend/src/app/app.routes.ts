@@ -34,7 +34,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/settings.component').then((m) => m.SettingsComponent),
       },
-      // Nowa ścieżka dla przelewów wewnętrznych
+
       {
         path: 'transfer',
         loadComponent: () =>

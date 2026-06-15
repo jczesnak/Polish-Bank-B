@@ -22,6 +22,35 @@ export interface BlikTransaction {
 
 export interface Account { id: string; iban: string; balance: string; blocked_funds: string; available_balance: string; currency: string; account_type: string; account_type_display: string; }
 
+export interface CardTransaction {
+  id: number;
+  amount: string;
+  currency: string;
+  merchant_name: string;
+  status: string;
+  created_at: string;
+}
+
+export interface UnifiedTransaction {
+  id: string;
+  type: 'TRANSFER' | 'BLIK' | 'CARD';
+  amount: string;
+  currency: string;
+  status: string;
+  created_at: string;
+  direction: 'IN' | 'OUT';
+  title: string;
+  
+
+  sender_name?: string;
+  sender_iban?: string;
+  recipient_name?: string;
+  recipient_iban?: string;
+  system_route?: string;
+  system_route_display?: string;
+  merchant_name?: string;
+}
+
 export interface Transfer {
   id: string;
   sender_iban?: string;
@@ -52,10 +81,10 @@ export class DashboardComponent implements OnInit {
 
   user = this.auth.user;
   accounts = signal<Account[]>([]);
-  transfers = signal<Transfer[]>([]);
+  allTransactions = signal<UnifiedTransaction[]>([]);
   blikTransactions = signal<BlikTransaction[]>([]);
   
-  // Stan Kart
+
   cards = signal<any[]>([]);
   loadingCards = signal(false);
   currentCardIndex = signal(0);
@@ -83,13 +112,14 @@ export class DashboardComponent implements OnInit {
   selectedCardDetails = signal<any>(null);
 
   showOrderCardModal = signal(false);
+  hoveredChartPoint = signal<any>(null);
 
   loadingAccounts = signal(true);
   loadingTransfers = signal(true);
   loadingBlik = signal(true);
   private previousBalance = -1;
 
-  // Stan Modali
+
   showTransferModal = signal(false);
   showBlikModal = signal(false);
 
@@ -114,13 +144,13 @@ export class DashboardComponent implements OnInit {
 
   readonly filteredTransfers = computed(() => {
     const f = this.historyFilter();
-    const all = this.transfers();
+    const all = this.allTransactions();
     if (f === 'all') return all;
     return all.filter(t => t.direction === (f === 'in' ? 'IN' : 'OUT'));
   });
 
   readonly historyCounts = computed(() => {
-    const all = this.transfers();
+    const all = this.allTransactions();
     return {
       all: all.length,
       out: all.filter(t => t.direction === 'OUT').length,
@@ -150,54 +180,78 @@ export class DashboardComponent implements OnInit {
   );
 
   readonly wydatki = computed(() =>
-    this.transfers().filter(t => t.direction === 'OUT')
+    this.allTransactions().filter(t => t.direction === 'OUT')
       .reduce((sum, t) => sum + parseFloat(t.amount), 0)
   );
 
   readonly wplywy = computed(() =>
-    this.transfers().filter(t => t.direction === 'IN')
+    this.allTransactions().filter(t => t.direction === 'IN')
       .reduce((sum, t) => sum + parseFloat(t.amount), 0)
   );
 
-  readonly balanceChartData = computed(() => {
-    const sorted = [...this.transfers()]
+  readonly balanceChart = computed(() => {
+    const sorted = [...this.allTransactions()]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const current = this.totalBalance();
-    const points: { label: string; balance: number }[] = [
+    const rawPoints: { label: string; balance: number; transaction?: any }[] = [
       { label: 'Teraz', balance: current },
     ];
 
     let running = current;
-    for (const t of sorted.slice(0, 7)) {
+    for (const t of sorted.slice(0, 14)) { // Pobieramy do 14 punktów dla lepszego wykresu
       running += t.direction === 'OUT' ? parseFloat(t.amount) : -parseFloat(t.amount);
       const d = new Date(t.created_at);
-      points.push({
+      rawPoints.push({
         label: d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
         balance: Math.max(0, running),
+        transaction: t
       });
     }
 
-    const reversed = points.reverse();
+    const reversed = rawPoints.reverse();
+    if (reversed.length < 2) return null;
+
+    const minBal = Math.min(...reversed.map(p => p.balance));
     const maxBal = Math.max(...reversed.map(p => p.balance), 1);
+    const range = maxBal - minBal || 1;
 
-    return reversed.map(p => ({
-      label: p.label,
-      balance: p.balance,
-      balanceStr: p.balance.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      heightPct: Math.max(Math.round((p.balance / maxBal) * 100), 5),
-      isCurrent: p.label === 'Teraz',
-    }));
-  });
 
-  readonly minBalance = computed(() => {
-    const d = this.balanceChartData();
-    return d.length > 0 ? Math.min(...d.map(p => p.balance)) : 0;
-  });
+    const w = 1000;
+    const h = 300;
+    
 
-  readonly maxBalance = computed(() => {
-    const d = this.balanceChartData();
-    return d.length > 0 ? Math.max(...d.map(p => p.balance)) : 0;
+    const points = reversed.map((p, i) => {
+      const x = (i / (reversed.length - 1)) * w;
+      const normalized = (p.balance - minBal) / range;
+      const y = h - (h * 0.1) - (normalized * h * 0.8);
+      
+
+      const tooltipX = x < w * 0.2 ? '0%' : (x > w * 0.8 ? '-100%' : '-50%');
+      const tooltipY = y < h * 0.35 ? '15px' : '-115%';
+      
+      return {
+        ...p,
+        balanceStr: p.balance.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        x, y,
+        isCurrent: p.label === 'Teraz',
+        tooltipTransform: `translate(${tooltipX}, ${tooltipY})`
+      };
+    });
+
+
+    let pathD = `M ${points[0].x},${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i+1];
+      const ctrlX1 = p1.x + (p2.x - p1.x) / 3;
+      const ctrlX2 = p2.x - (p2.x - p1.x) / 3;
+      pathD += ` C ${ctrlX1},${p1.y} ${ctrlX2},${p2.y} ${p2.x},${p2.y}`;
+    }
+
+    const areaD = `${pathD} L ${w},${h} L 0,${h} Z`;
+
+    return { points, pathD, areaD, minBal, maxBal };
   });
 
   transferForm = this.fb.group({
@@ -220,7 +274,7 @@ export class DashboardComponent implements OnInit {
     this.loadCards();
   }
 
-  // --- Obsługa Kart ---
+
   loadCards() {
     this.loadingCards.set(true);
     this.cardService.getCards().subscribe({
@@ -349,7 +403,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  // --- Reszta logiki (niezmieniona) ---
+
   loadBlikTransactions() {
     this.loadingBlik.set(true);
     this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))).subscribe({
@@ -388,13 +442,38 @@ export class DashboardComponent implements OnInit {
     forkJoin({
       outgoing: this.http.get<Transfer[]>('/api/transfers/').pipe(catchError(() => of([]))),
       incoming: this.http.get<Transfer[]>('/api/transfers/incoming/').pipe(catchError(() => of([]))),
+      blik: this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))),
+      cards: this.http.get<CardTransaction[]>('/api/cards/transactions/').pipe(catchError(() => of([])))
     }).subscribe({
-      next: ({ outgoing, incoming }) => {
-        const merged = [
-          ...outgoing.map(t => ({ ...t, direction: 'OUT' as const })),
-          ...incoming.map(t => ({ ...t, direction: 'IN' as const })),
-        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        this.transfers.set(merged);
+      next: ({ outgoing, incoming, blik, cards }) => {
+        const unified: UnifiedTransaction[] = [];
+        
+        outgoing.forEach(t => unified.push({
+          id: t.id, type: 'TRANSFER', direction: 'OUT',
+          amount: t.amount, currency: 'PLN', status: t.status, created_at: t.created_at,
+          title: t.title, recipient_name: t.recipient_name, system_route_display: t.system_route_display || t.system_route
+        }));
+        
+        incoming.forEach(t => unified.push({
+          id: t.id, type: 'TRANSFER', direction: 'IN',
+          amount: t.amount, currency: 'PLN', status: t.status, created_at: t.created_at,
+          title: t.title, sender_name: t.sender_name || t.sender_iban, system_route_display: t.system_route_display || t.system_route
+        }));
+        
+        blik.forEach(t => unified.push({
+          id: String(t.id), type: 'BLIK', direction: 'OUT',
+          amount: t.amount, currency: t.currency, status: t.status, created_at: t.created_at,
+          title: 'Płatność BLIK', merchant_name: t.merchant_name
+        }));
+        
+        cards.forEach(t => unified.push({
+          id: String(t.id), type: 'CARD', direction: 'OUT',
+          amount: t.amount, currency: t.currency, status: t.status, created_at: t.created_at,
+          title: 'Płatność Kartą', merchant_name: t.merchant_name
+        }));
+
+        const merged = unified.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        this.allTransactions.set(merged);
         this.loadingTransfers.set(false);
       },
       error: () => this.loadingTransfers.set(false),

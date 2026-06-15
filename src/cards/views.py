@@ -1,13 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework import status, generics
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
 
 from accounts.models import Account
-from .models import PaymentCard  
+from .models import PaymentCard, CardTransaction
+from .serializers import CardTransactionSerializer
 from .services import CardIntegrationService
 
 class OrderCardView(APIView):
@@ -57,6 +58,7 @@ class UserCardsView(APIView):
             details = card_service.get_card_details(card_token=card.external_card_id)
             if details.get("success"):
                 data["status"] = details.get("status")
+                data["card_type"] = details.get("card_type")
             result_cards.append(data)
             
         return Response(result_cards, status=status.HTTP_200_OK)
@@ -89,6 +91,16 @@ class AuthorizeWebhookView(APIView):
                 if account.available_balance >= amount:
                     account.blocked_funds += amount
                     account.save()
+                    
+                    if card_token:
+                        CardTransaction.objects.create(
+                            card=card,
+                            amount=amount,
+                            currency=request.data.get("currency", "PLN"),
+                            merchant_name=request.data.get("merchant_id", "Nieznany sklep"),
+                            status=CardTransaction.Status.AUTHORIZED
+                        )
+                        
                     return Response({
                         "authorization_code": f"AUTH-{str(account.id)[:6]}",
                         "status": "APPROVED",
@@ -118,6 +130,8 @@ class CaptureWebhookView(APIView):
         # { "authorization_code": "AUTH-789XYZ", "transaction_id": "uuid", "amount": 150.00, "card_token": "..." }
         card_token = request.data.get("card_token")
         amount = request.data.get("amount")
+        merchant_id = request.data.get("merchant_id", "Nieznany sklep")
+        currency = request.data.get("currency", "PLN")
         
         if not card_token or amount is None:
             return Response({"error": "Brak parametrów do rozliczenia (card_token, amount)"}, status=status.HTTP_400_BAD_REQUEST)
@@ -138,6 +152,14 @@ class CaptureWebhookView(APIView):
                 account.balance -= amount
                 account.save()
                 
+                CardTransaction.objects.create(
+                    card=card,
+                    amount=amount,
+                    currency=currency,
+                    merchant_name=merchant_id,
+                    status=CardTransaction.Status.SETTLED
+                )
+                
             return Response({"status": "SETTLED"}, status=status.HTTP_200_OK)
             
         except PaymentCard.DoesNotExist:
@@ -151,6 +173,8 @@ class RefundWebhookView(APIView):
     def post(self, request):
         card_token = request.data.get("card_token")
         amount = request.data.get("amount")
+        merchant_id = request.data.get("merchant_id", "Nieznany sklep")
+        currency = request.data.get("currency", "PLN")
         
         if not card_token or amount is None:
             return Response({"error": "Brak parametrów (card_token, amount)"}, status=status.HTTP_400_BAD_REQUEST)
@@ -163,6 +187,14 @@ class RefundWebhookView(APIView):
                 
                 account.balance += amount
                 account.save()
+                
+                CardTransaction.objects.create(
+                    card=card,
+                    amount=amount,
+                    currency=currency,
+                    merchant_name=merchant_id,
+                    status=CardTransaction.Status.REFUNDED
+                )
                 
             return Response({"status": "REFUNDED"}, status=status.HTTP_200_OK)
         except PaymentCard.DoesNotExist:
@@ -293,3 +325,10 @@ class DevSimulateShippingView(APIView):
         if result.get("success"):
             return Response({"message": "Symulacja udana. Karta wysłana (SHIPPED)."}, status=status.HTTP_200_OK)
         return Response({"error": result.get("details", "Błąd symulacji.")}, status=status.HTTP_400_BAD_REQUEST)
+
+class CardTransactionListView(generics.ListAPIView):
+    serializer_class = CardTransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return CardTransaction.objects.filter(card__account__user=self.request.user)

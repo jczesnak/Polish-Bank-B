@@ -37,6 +37,44 @@ services:
       - default
       - cards-backend  # Podpięcie do sieci systemu kart
 
+  kafka_consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    command: python manage.py consume_elixir
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+    networks:
+      - default
+
+  express_consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    command: python manage.py consume_express_elixir
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+    networks:
+      - default
+
   frontend:
     image: node:20-alpine
     working_dir: /app

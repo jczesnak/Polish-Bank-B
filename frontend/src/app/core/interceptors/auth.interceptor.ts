@@ -24,7 +24,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
 
-      // Używamy HttpBackend żeby ominąć ten interceptor i uniknąć pętli
+
       const http = new HttpClient(backend);
       return http.post<{ access: string }>('/api/auth/token/refresh/', { refresh: refreshToken }).pipe(
         switchMap((res) => {

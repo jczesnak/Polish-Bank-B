@@ -8,7 +8,7 @@ module.exports = {
       },
       colors: {
         'bank-bg': '#0B1110', 
-        'bank-panel': '#121A18', 
+        'bank-panel': '#16201c', 
         'bank-border': '#1F2E2A',
         'brand': {
           DEFAULT: '#52FFB8',
