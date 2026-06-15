@@ -7,8 +7,9 @@ from django.db import transaction
 
 from .models import Transfer
 
-from .serializers import TransferSerializer, InternalTransferSerializer
+from .serializers import TransferSerializer, InternalTransferSerializer, CreateTransferSerializer
 from accounts.models import Account
+from .services import ElixirIntegrationService
 
 
 class IncomingTransferListView(generics.ListAPIView):
@@ -24,13 +25,59 @@ class TransferListCreateView(generics.ListCreateAPIView):
     serializer_class = TransferSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CreateTransferSerializer
+        return TransferSerializer
 
+    def get_queryset(self):
         return Transfer.objects.filter(sender_account__user=self.request.user)
         
+    @transaction.atomic
     def perform_create(self, serializer):
-
-        serializer.save()
+        transfer = serializer.save(status='PENDING')
+        
+        # Jeśli przelew idzie systemem ELIXIR, blokujemy środki i wysyłamy do Elixira
+        if transfer.system_route == 'ELIXIR':
+            account = Account.objects.select_for_update().get(id=transfer.sender_account.id)
+            account.blocked_funds += transfer.amount
+            account.save()
+            
+            try:
+                ElixirIntegrationService.send_transfer(transfer)
+            except Exception as e:
+                raise e
+        # Jeśli przelew idzie systemem EXPRESS_ELIXIR, blokujemy środki i wysyłamy do Express Elixira
+        elif transfer.system_route == 'EXPRESS_ELIXIR':
+            account = Account.objects.select_for_update().get(id=transfer.sender_account.id)
+            account.blocked_funds += transfer.amount
+            account.save()
+            
+            try:
+                from .services import ExpressElixirIntegrationService
+                ExpressElixirIntegrationService.send_transfer(transfer)
+            except Exception as e:
+                raise e
+        elif transfer.system_route == 'SORBNET':
+            account = Account.objects.select_for_update().get(id=transfer.sender_account.id)
+            
+            try:
+                from .services import SorbnetIntegrationService
+                status = SorbnetIntegrationService.send_transfer(transfer)
+                
+                if status == 'SETTLED':
+                    transfer.status = 'COMPLETED'
+                    transfer.save()
+                    account.balance -= transfer.amount
+                    account.save()
+                elif status == 'REJECTED':
+                    transfer.status = 'FAILED'
+                    transfer.save()
+                elif status == 'GRIDLOCK_HELD':
+                    account.blocked_funds += transfer.amount
+                    account.save()
+            except Exception as e:
+                raise e
 
 class TransferDetailView(generics.RetrieveAPIView):
     serializer_class = TransferSerializer

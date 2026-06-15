@@ -23,5 +23,9 @@ done
 
 echo "PostgreSQL gotowy!"
 
-python manage.py migrate --noinput
-python manage.py runserver 0.0.0.0:8000
+if [ $# -eq 0 ]; then
+    python manage.py migrate --noinput
+    exec python manage.py runserver 0.0.0.0:8000
+else
+    exec "$@"
+fi

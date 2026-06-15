@@ -176,8 +176,10 @@ class CardIntegrationService:
 
     def activate_card(self, card_token):
         url = f"{self.base_url}/api/v1/cards/{card_token}/activate"
+        body = {"activated_by": "customer"}
+        headers = self._get_headers(body)
         try:
-            response = requests.post(url, json={"activated_by": "customer"}, timeout=10)
+            response = requests.post(url, json=body, headers=headers, timeout=10)
             if response.status_code == 200:
                 return {"success": True, "message": "Karta została aktywowana."}
             else:
@@ -187,8 +189,10 @@ class CardIntegrationService:
 
     def topup_prepaid(self, card_token, amount):
         url = f"{self.base_url}/api/v1/cards/{card_token}/topup"
+        body = {"amount": float(amount), "currency": "PLN"}
+        headers = self._get_headers(body)
         try:
-            response = requests.post(url, json={"amount": float(amount), "currency": "PLN"}, timeout=10)
+            response = requests.post(url, json=body, headers=headers, timeout=10)
             if response.status_code == 200:
                 return {"success": True, "new_balance": response.json().get("new_balance")}
             else:

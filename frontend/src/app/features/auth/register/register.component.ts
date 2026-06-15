@@ -36,7 +36,7 @@ export class RegisterComponent {
       last_name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       pesel: ['', peselValidator],
-      phone_number: ['', phoneValidator], // <-- Podpięty nowy walidator
+      phone_number: ['', phoneValidator],
       password: ['', [Validators.required, Validators.minLength(8)]],
       password_confirm: ['', Validators.required],
     },

@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class TransferService {
-  // Pamiętaj, że proxy.conf.json przekieruje /api do Django
+
   private apiUrl = '/api/transfers'; 
 
   constructor(private http: HttpClient) {}
