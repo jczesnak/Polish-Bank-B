@@ -138,3 +138,22 @@ class TopUpView(APIView):
         account.balance += amount
         account.save()
         return Response(AccountSerializer(account).data)
+
+
+class SetBlikPinView(APIView):
+    """Ustawienie 4-cyfrowego kodu PIN dla transakcji BLIK."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import django.contrib.auth.hashers as hashers
+        pin = request.data.get('pin', '').strip()
+        
+        if not pin or len(pin) != 4 or not pin.isdigit():
+            return Response(
+                {'pin': 'PIN musi składać się z dokładnie 4 cyfr.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.blik_pin = hashers.make_password(pin)
+        request.user.save(update_fields=['blik_pin'])
+        return Response({'detail': 'PIN BLIK został poprawnie ustawiony.'})

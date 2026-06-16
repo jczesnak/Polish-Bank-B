@@ -81,8 +81,22 @@
                 <h3 class="text-sm font-semibold text-white">Powiadomienia</h3>
                 <button (click)="notifSvc.clear()" class="text-xs text-zinc-400 hover:text-white transition-colors">Wyczyść</button>
               </div>
+
+              <!-- Specjalny banner dla oczekującego BLIKa -->
+              <div *ngIf="pendingBlikTransaction()" class="p-3 bg-brand/10 border-b border-brand/30 cursor-pointer hover:bg-brand/20 transition-colors" (click)="openBlikModal()">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-bold text-brand">Transakcja BLIK oczekuje!</p>
+                    <p class="text-xs text-gray-300 mt-1">Sklep: {{ pendingBlikTransaction()?.merchant_name }}</p>
+                    <p class="text-xs font-semibold text-white mt-0.5">Kwota: {{ pendingBlikTransaction()?.amount }} PLN</p>
+                  </div>
+                  <div class="w-8 h-8 rounded-full bg-brand text-black flex items-center justify-center font-bold text-lg">🎲</div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2 uppercase tracking-wider font-semibold">Kliknij tutaj, aby zatwierdzić</p>
+              </div>
+
               <div class="max-h-80 overflow-y-auto">
-                <div *ngIf="notifSvc.items().length === 0" class="px-4 py-8 text-center text-gray-500 text-sm">
+                <div *ngIf="notifSvc.items().length === 0 && !pendingBlikTransaction()" class="px-4 py-8 text-center text-gray-500 text-sm">
                   Brak powiadomień
                 </div>
                 <div *ngFor="let n of notifSvc.items()"
@@ -116,5 +130,42 @@
     <main class="flex-1 overflow-y-auto p-8 relative">
       <router-outlet />
     </main>
+  </div>
+</div>
+
+<div *ngIf="showBlikModal()" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="showBlikModal.set(false)"></div>
+  <div class="relative w-full max-w-sm card p-8 z-10 flex flex-col items-center text-center shadow-[0_0_60px_rgba(0,229,124,0.15)] border-brand/30 bg-bank-panel/95">
+    <div class="w-14 h-14 bg-brand/10 rounded-full flex items-center justify-center mb-3">
+      <span class="text-2xl">🎲</span>
+    </div>
+    <h2 class="text-2xl font-light tracking-wide text-white mb-1">Potwierdź Płatność</h2>
+    <p class="text-sm text-gray-400 mb-4">Sklep prosi o potwierdzenie płatności BLIK.</p>
+    
+    <div class="bg-bank-bg border border-bank-border w-full rounded-xl p-4 mb-6 text-left">
+      <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Kwota do zapłaty</p>
+      <p class="text-3xl font-light text-white mb-3">{{ pendingBlikTransaction()?.amount }} <span class="text-sm text-brand">PLN</span></p>
+      <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Sklep / Odbiorca</p>
+      <p class="text-lg font-medium text-white">{{ pendingBlikTransaction()?.merchant_name || 'Sklep BLIK' }}</p>
+    </div>
+
+    <form [formGroup]="blikAuthForm" (ngSubmit)="authorizeBlikTransaction()" class="w-full">
+      <label class="block text-sm font-semibold text-gray-400 mb-2">Podaj PIN BLIK</label>
+      <input formControlName="pin" type="password" maxlength="4" class="input-field text-center text-3xl tracking-[1em] font-mono py-3 mb-4" placeholder="••••">
+      
+      <div *ngIf="blikAuthError()" class="w-full mb-4 px-4 py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm">
+        {{ blikAuthError() }}
+      </div>
+
+      <div class="flex gap-3 w-full">
+        <button type="button" (click)="rejectBlikTransaction()" [disabled]="blikAuthLoading()" class="flex-1 bg-red-950/50 hover:bg-red-900 text-red-400 border border-red-900/50 py-3 rounded-xl transition-all font-semibold">
+          Odrzuć
+        </button>
+        <button type="submit" [disabled]="blikAuthLoading() || blikAuthForm.invalid" class="flex-1 btn-primary py-3 flex items-center justify-center gap-2">
+          <svg *ngIf="blikAuthLoading()" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          Zapłać
+        </button>
+      </div>
+    </form>
   </div>
 </div>

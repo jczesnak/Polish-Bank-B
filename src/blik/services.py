@@ -79,8 +79,8 @@ class KlikService:
         return self._request('POST', '/codes/generate', {'user_id': user_id, 'zone': zone})
 
     def confirm_payment(self, transaction_id: str, decision: str, reject_reason: str = None) -> dict:
-        # KLIK wymaga pola `decision` (ACCEPTED/REJECTED), nie `status`.
-        payload = {'transaction_id': transaction_id, 'decision': decision}
+        # KLIK wymaga pola `status` (ACCEPTED/REJECTED).
+        payload = {'transaction_id': transaction_id, 'status': decision}
         if decision == 'ACCEPTED':
             payload['authorization_timestamp'] = timezone.now().isoformat()
         elif decision == 'REJECTED' and reject_reason:

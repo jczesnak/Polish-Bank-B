@@ -8,6 +8,7 @@ class User(AbstractUser):
     pesel = models.CharField(max_length=11, unique=True, blank=True, null=True)
     phone_number = models.CharField(max_length=9, blank=True)
     email = models.EmailField(unique=True)
+    blik_pin = models.CharField(max_length=128, null=True, blank=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
