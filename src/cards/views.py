@@ -57,8 +57,11 @@ class UserCardsView(APIView):
             # Doczytywanie statusu zewnętrznego (np. PRODUCING, SHIPPED)
             details = card_service.get_card_details(card_token=card.external_card_id)
             if details.get("success"):
-                data["status"] = details.get("status")
+                ext_status = details.get("status")
+                data["status"] = ext_status
                 data["card_type"] = details.get("card_type")
+                data["balance"] = details.get("balance")
+                data["is_active"] = ext_status == "ACTIVE"
             result_cards.append(data)
             
         return Response(result_cards, status=status.HTTP_200_OK)

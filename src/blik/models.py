@@ -48,6 +48,7 @@ class BlikTransaction(models.Model):
     merchant_name = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDING)
     reject_reason = models.CharField(max_length=30, choices=RejectReason.choices, blank=True)
+    needs_parent_auth = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

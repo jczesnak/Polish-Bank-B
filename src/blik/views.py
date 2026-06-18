@@ -2,6 +2,7 @@ import re
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import generics, status
@@ -120,6 +121,11 @@ class BlikWebhookAuthorizeView(APIView):
             account.blocked_funds += amount
             account.save(update_fields=['blocked_funds'])
 
+            needs_parent_auth = False
+            if hasattr(blik_code.user, 'junior_profile'):
+                if amount > blik_code.user.junior_profile.blik_limit:
+                    needs_parent_auth = True
+
             transaction = BlikTransaction.objects.create(
                 klik_transaction_id=data['transaction_id'],
                 account=account,
@@ -127,6 +133,7 @@ class BlikWebhookAuthorizeView(APIView):
                 amount=amount,
                 currency=data['currency'],
                 merchant_name=data.get('merchant_name', ''),
+                needs_parent_auth=needs_parent_auth
             )
             self._finalize_code(blik_code)
 
@@ -180,7 +187,11 @@ class BlikTransactionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return BlikTransaction.objects.filter(user=self.request.user)
+        user = self.request.user
+        return BlikTransaction.objects.filter(
+            Q(user=user) |
+            Q(user__junior_profile__parent=user, needs_parent_auth=True, status=BlikTransaction.Status.PENDING)
+        ).distinct()
 
 
 # --- P2P (przelew na telefon) --------------------------------------------
@@ -438,7 +449,13 @@ class BlikTransactionAuthorizeView(APIView):
             return Response({'pin': 'Niepoprawny PIN.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            transaction = BlikTransaction.objects.get(id=pk, user=request.user, status=BlikTransaction.Status.PENDING)
+            transaction = BlikTransaction.objects.get(id=pk, status=BlikTransaction.Status.PENDING)
+            if transaction.needs_parent_auth:
+                if not hasattr(transaction.user, 'junior_profile') or transaction.user.junior_profile.parent != request.user:
+                    return Response({'detail': 'Brak uprawnień. Transakcja wymaga zgody rodzica.'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if transaction.user != request.user:
+                    return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
         except BlikTransaction.DoesNotExist:
             return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -483,7 +500,13 @@ class BlikTransactionRejectView(APIView):
 
     def post(self, request, pk):
         try:
-            transaction = BlikTransaction.objects.get(id=pk, user=request.user, status=BlikTransaction.Status.PENDING)
+            transaction = BlikTransaction.objects.get(id=pk, status=BlikTransaction.Status.PENDING)
+            if transaction.needs_parent_auth:
+                if not hasattr(transaction.user, 'junior_profile') or transaction.user.junior_profile.parent != request.user:
+                    return Response({'detail': 'Brak uprawnień. Transakcja wymaga zgody rodzica.'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if transaction.user != request.user:
+                    return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
         except BlikTransaction.DoesNotExist:
             return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
 

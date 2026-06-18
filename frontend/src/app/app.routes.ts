@@ -19,6 +19,12 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'junior-dashboard',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/junior-dashboard/junior-dashboard.component').then((m) => m.JuniorDashboardComponent),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>

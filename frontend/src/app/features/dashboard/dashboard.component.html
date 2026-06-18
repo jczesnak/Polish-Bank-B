@@ -245,6 +245,8 @@
   </div>
 
   <div class="lg:col-span-2 2xl:col-span-4 flex flex-col gap-6 sticky top-8">
+
+    <!-- Historia salda -->
     <div class="card p-6 relative overflow-hidden">
       <div class="absolute -right-10 -top-10 w-32 h-32 bg-brand blur-[80px] opacity-10 pointer-events-none"></div>
       <div class="flex justify-between items-center mb-4 relative z-10">
@@ -322,7 +324,102 @@
       </div>
     </div>
 
+    <!-- Wnioski przelewowe od dzieci -->
+    <div *ngIf="juniorTransferRequests().length > 0" class="card p-6 relative overflow-hidden border border-yellow-500/30">
+      <div class="absolute -right-10 -top-10 w-32 h-32 bg-yellow-400/10 blur-[80px] opacity-60 pointer-events-none"></div>
+      <div class="flex justify-between items-center mb-4 relative z-10">
+        <h3 class="text-sm text-zinc-300 uppercase tracking-wider font-semibold flex items-center gap-2">
+          <span class="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center text-[10px] font-black text-black">{{ juniorTransferRequests().length }}</span>
+          Wnioski przelewowe dzieci
+        </h3>
+      </div>
+      <div class="flex flex-col gap-2 relative z-10">
+        <div *ngFor="let req of juniorTransferRequests()"
+             class="flex items-center justify-between p-3 rounded-xl bg-zinc-800/60 border border-yellow-500/20 gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-zinc-100 truncate">{{ req.junior_name }} → {{ req.recipient_name }}</p>
+              <p class="text-xs text-zinc-400 truncate">{{ req.title }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-sm font-bold text-zinc-100">{{ req.amount }} PLN</span>
+            <button (click)="openTransferApproval(req)"
+                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-brand text-black hover:bg-emerald-400 transition-colors">
+              Rozpatrz
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
+    <!-- Konta Junior -->
+    <div class="card p-6 relative overflow-hidden">
+      <div class="absolute -left-10 -top-10 w-32 h-32 bg-yellow-400/10 blur-[80px] opacity-60 pointer-events-none"></div>
+      <div class="flex justify-between items-center mb-4 relative z-10">
+        <h3 class="text-sm text-zinc-300 uppercase tracking-wider font-semibold flex items-center gap-2">
+          <span>👨‍👧</span> Konta Junior
+        </h3>
+        <button (click)="openCreateJuniorModal()" class="text-xs text-brand hover:text-emerald-400 font-bold uppercase transition-colors">+ Nowe</button>
+      </div>
+
+      <div *ngIf="loadingJuniors()" class="text-center py-6 text-zinc-500 text-sm">Ładowanie...</div>
+
+      <div *ngIf="!loadingJuniors() && juniors().length === 0" class="flex flex-col items-center py-6 gap-3">
+        <span class="text-4xl">🧒</span>
+        <p class="text-sm text-zinc-400 text-center">Brak kont Junior.<br>Utwórz pierwsze konto dla dziecka.</p>
+        <button (click)="openCreateJuniorModal()" class="btn-primary text-xs px-4 py-2 rounded-lg">Utwórz konto</button>
+      </div>
+
+      <div class="flex flex-col gap-3 relative z-10">
+        <div *ngFor="let junior of juniors()" class="bg-bank-bg border border-bank-border rounded-xl p-4 hover:border-yellow-400/30 transition-colors">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-full bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-300 font-bold text-sm flex-shrink-0">
+              {{ junior.user.first_name.charAt(0) }}{{ junior.user.last_name.charAt(0) }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-white truncate">{{ junior.user.first_name }} {{ junior.user.last_name }}</p>
+              <p class="text-xs text-zinc-400 truncate">{{ junior.user.email }}</p>
+            </div>
+          </div>
+
+          <div class="bg-bank-panel/50 rounded-lg p-3 mb-3">
+            <span class="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Kieszonkowe</span>
+            <p class="text-lg font-bold text-yellow-300 mt-0.5">{{ junior.account_balance | number:'1.2-2' }} PLN</p>
+            <div *ngIf="junior.prepaid_card_masked_number" class="flex items-center gap-2 mt-1">
+              <p class="text-xs text-zinc-500 font-mono">•••• •••• •••• {{ junior.prepaid_card_masked_number.slice(-4) }}</p>
+              <span *ngIf="junior.prepaid_card_status && junior.prepaid_card_status !== 'ACTIVE'"
+                    class="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                Oczekuje na aktywację
+              </span>
+            </div>
+          </div>
+
+          <div class="flex gap-2 text-[10px] uppercase tracking-wider mb-3">
+            <span class="bg-bank-panel border border-bank-border px-2 py-1 rounded-md text-zinc-300 flex items-center gap-1">
+              📅 Dzień: <strong class="text-white">{{ junior.daily_limit }} PLN</strong>
+            </span>
+            <span class="bg-bank-panel border border-bank-border px-2 py-1 rounded-md text-zinc-300 flex items-center gap-1">
+              🎲 BLIK: <strong class="text-white">{{ junior.blik_limit }} PLN</strong>
+            </span>
+          </div>
+
+          <div class="flex gap-2">
+            <button (click)="openTopUpModal(junior)" class="flex-1 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 text-xs py-2 rounded-lg font-semibold transition-all">
+              💰 Doładuj
+            </button>
+            <button (click)="openJuniorModal(junior)" class="flex-1 bg-bank-panel hover:bg-white/5 border border-bank-border text-zinc-300 hover:text-white text-xs py-2 rounded-lg font-semibold transition-all">
+              ⚙ Limity
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -680,11 +777,16 @@
         Doładuj konto karty
       </button>
 
-      <button (click)="onDeleteCard(selectedCardDetails().id); showDetailsModal.set(false)" 
+      <button (click)="onDeleteCard(selectedCardDetails().id); showDetailsModal.set(false)"
               class="w-full max-w-sm relative z-10 bg-black/40 hover:bg-red-950/80 text-gray-400 hover:text-red-400 border border-bank-border hover:border-red-900/50 font-bold rounded-2xl py-3 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
         Usuń trwale kartę
-    <div *ngIf="pendingBlikTransaction()" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      </button>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="pendingBlikTransaction()" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
   <div class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
   <div class="relative w-full max-w-sm card p-8 z-10 flex flex-col items-center text-center shadow-[0_0_60px_rgba(0,229,124,0.15)] border-brand/30 bg-bank-panel/95">
     <div class="w-14 h-14 bg-brand/10 rounded-full flex items-center justify-center mb-3">
@@ -692,7 +794,7 @@
     </div>
     <h2 class="text-2xl font-light tracking-wide text-white mb-1">Potwierdź Płatność</h2>
     <p class="text-sm text-gray-400 mb-4">Sklep prosi o potwierdzenie płatności BLIK.</p>
-    
+
     <div class="bg-bank-bg border border-bank-border w-full rounded-xl p-4 mb-6 text-left">
       <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Kwota do zapłaty</p>
       <p class="text-3xl font-light text-white mb-3">{{ pendingBlikTransaction()?.amount }} <span class="text-sm text-brand">PLN</span></p>
@@ -703,7 +805,7 @@
     <form [formGroup]="blikAuthForm" (ngSubmit)="authorizeBlikTransaction()" class="w-full">
       <label class="block text-sm font-semibold text-gray-400 mb-2">Podaj PIN BLIK</label>
       <input formControlName="pin" type="password" maxlength="4" class="input-field text-center text-3xl tracking-[1em] font-mono py-3 mb-4" placeholder="••••">
-      
+
       <div *ngIf="blikAuthError()" class="w-full mb-4 px-4 py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm">
         {{ blikAuthError() }}
       </div>
@@ -718,6 +820,262 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modal: Utwórz konto Junior -->
+<div *ngIf="showCreateJuniorModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="closeCreateJuniorModal()"></div>
+  <div class="relative w-full max-w-lg card p-0 overflow-hidden z-10 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-bank-border flex flex-col max-h-[90vh]">
+    <div class="px-8 py-6 border-b border-bank-border flex items-center justify-between bg-bank-bg/90 backdrop-blur-sm shrink-0">
+      <div>
+        <h2 class="text-2xl font-light tracking-wide text-white flex items-center gap-2">👨‍👧 Nowe konto Junior</h2>
+        <p class="text-sm text-gray-400 mt-1">Wypełnij dane logowania dla dziecka</p>
+      </div>
+      <button (click)="closeCreateJuniorModal()" class="text-gray-500 hover:text-white p-2.5 bg-bank-panel rounded-full border border-bank-border transition-colors hover:border-brand/50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="p-8 bg-bank-panel overflow-y-auto">
+      <form [formGroup]="createJuniorForm" (ngSubmit)="submitCreateJunior()" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Imię dziecka</label>
+            <input formControlName="first_name" type="text" class="input-field py-3" placeholder="np. Kacper">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Nazwisko</label>
+            <input formControlName="last_name" type="text" class="input-field py-3" placeholder="np. Kowalski">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">PESEL dziecka</label>
+          <input formControlName="pesel" type="text" maxlength="11" class="input-field py-3 font-mono tracking-widest" placeholder="11 cyfr">
+          <p class="text-xs text-zinc-500 mt-1">Dziecko musi mieć mniej niż 12 lat. PESEL zostanie zweryfikowany.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">Email (login dziecka)</label>
+          <input formControlName="email" type="email" class="input-field py-3" placeholder="np. kacper@rodzina.pl">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">Hasło do konta</label>
+          <input formControlName="password" type="password" class="input-field py-3" placeholder="Min. 8 znaków">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Limit dzienny (PLN)</label>
+            <input formControlName="daily_limit" type="number" class="input-field py-3" placeholder="100">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-400 mb-2">Limit BLIK (PLN)</label>
+            <input formControlName="blik_limit" type="number" class="input-field py-3" placeholder="50">
+            <p class="text-xs text-zinc-500 mt-1">Powyżej tego limitu wymagane jest Twoje zatwierdzenie.</p>
+          </div>
+        </div>
+
+        <div *ngIf="createJuniorError()" class="px-4 py-3 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm">
+          {{ createJuniorError() }}
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" (click)="closeCreateJuniorModal()" class="btn-secondary px-6 py-3 rounded-xl">Anuluj</button>
+          <button type="submit" [disabled]="createJuniorForm.invalid || createJuniorLoading()" class="btn-primary px-6 py-3 rounded-xl flex items-center gap-2">
+            <svg *ngIf="createJuniorLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            {{ createJuniorLoading() ? 'Tworzenie...' : 'Utwórz konto' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Limity Junior -->
+<div *ngIf="showJuniorModal() && selectedJunior()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="closeJuniorModal()"></div>
+  <div class="relative w-full max-w-sm card p-0 overflow-hidden z-10 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-bank-border flex flex-col">
+    <div class="px-6 py-5 border-b border-bank-border flex items-center justify-between bg-bank-bg/90 backdrop-blur-sm">
+      <div>
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+          <span class="w-8 h-8 rounded-full bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-300 text-sm font-bold">
+            {{ selectedJunior().user.first_name.charAt(0) }}
+          </span>
+          {{ selectedJunior().user.first_name }} {{ selectedJunior().user.last_name }}
+        </h2>
+        <p class="text-xs text-gray-400 mt-1">Ustaw limity wydatków</p>
+      </div>
+      <button (click)="closeJuniorModal()" class="text-gray-500 hover:text-white p-2 bg-bank-panel rounded-full border border-bank-border transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="p-6 bg-bank-panel">
+      <form [formGroup]="juniorLimitsForm" (ngSubmit)="saveJuniorLimits()" class="space-y-5">
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">📅 Limit dzienny (PLN)</label>
+          <input formControlName="daily_limit" type="number" class="input-field py-3 text-lg" placeholder="100.00">
+          <p class="text-xs text-zinc-500 mt-1">Maksymalna kwota wydatków dziecka w ciągu dnia.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">🎲 Limit BLIK (PLN)</label>
+          <input formControlName="blik_limit" type="number" class="input-field py-3 text-lg" placeholder="50.00">
+          <p class="text-xs text-zinc-500 mt-1">Płatności BLIK powyżej tego limitu wymagają Twojego zatwierdzenia.</p>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" (click)="closeJuniorModal()" class="flex-1 btn-secondary py-3 rounded-xl">Anuluj</button>
+          <button type="submit" [disabled]="juniorLimitsForm.invalid" class="flex-1 btn-primary py-3 rounded-xl">Zapisz</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Doładuj Junior -->
+<div *ngIf="showTopUpModal() && selectedJuniorForTopUp()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-md" (click)="closeTopUpModal()"></div>
+  <div class="relative w-full max-w-sm card p-0 overflow-hidden z-10 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-yellow-500/20 flex flex-col">
+    <!-- Header -->
+    <div class="px-6 py-5 border-b border-bank-border flex items-center justify-between bg-bank-bg/90 backdrop-blur-sm">
+      <div>
+        <h2 class="text-lg font-semibold text-white">💰 Doładowanie Junior</h2>
+        <p class="text-xs text-gray-400 mt-1">{{ selectedJuniorForTopUp().user.first_name }} {{ selectedJuniorForTopUp().user.last_name }}</p>
+      </div>
+      <button (click)="closeTopUpModal()" class="text-gray-500 hover:text-white p-2 bg-bank-panel rounded-full border border-bank-border transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-bank-border bg-bank-bg/60">
+      <button type="button"
+              (click)="topUpMode.set('account'); topUpError.set(''); topUpSuccess.set('')"
+              class="flex-1 py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2"
+              [ngClass]="topUpMode() === 'account' ? 'text-brand border-b-2 border-brand bg-brand/5' : 'text-gray-400 hover:text-white'">
+        🎲 Kieszonkowe (BLIK)
+      </button>
+      <button type="button"
+              (click)="topUpMode.set('card'); topUpError.set(''); topUpSuccess.set('')"
+              class="flex-1 py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2"
+              [ngClass]="topUpMode() === 'card' ? 'text-yellow-300 border-b-2 border-yellow-400 bg-yellow-400/5' : 'text-gray-400 hover:text-white'">
+        💳 Karta Prepaid
+      </button>
+    </div>
+
+    <div class="p-6 bg-bank-panel">
+      <!-- Account mode info -->
+      <div *ngIf="topUpMode() === 'account'" class="bg-bank-bg border border-bank-border rounded-xl p-4 mb-5 flex items-start gap-3">
+        <span class="text-xl mt-0.5">🎲</span>
+        <div>
+          <p class="text-xs text-zinc-500 uppercase tracking-wider mb-0.5">Saldo BLIK dziecka</p>
+          <p class="text-lg font-semibold text-white">{{ selectedJuniorForTopUp().account_balance | number:'1.2-2' }} PLN</p>
+          <p class="text-xs text-zinc-500 mt-1">Przelew z Twojego konta na konto dziecka — dziecko może płacić BLIKiem.</p>
+        </div>
+      </div>
+
+      <!-- Card mode info -->
+      <div *ngIf="topUpMode() === 'card'">
+        <div *ngIf="selectedJuniorForTopUp().prepaid_card_masked_number; else noCardBlock" class="bg-bank-bg border border-bank-border rounded-xl p-4 mb-5 flex items-start gap-3">
+          <span class="text-xl mt-0.5">💳</span>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-0.5">Karta Prepaid</p>
+            <p class="text-sm font-mono text-white">•••• •••• •••• {{ selectedJuniorForTopUp().prepaid_card_masked_number.slice(-4) }}</p>
+            <p *ngIf="selectedJuniorForTopUp().prepaid_card_status !== 'ACTIVE'" class="text-xs text-yellow-300 font-semibold mt-1">
+              ⚠️ Status: {{ selectedJuniorForTopUp().prepaid_card_status || 'REQUESTED' }} — aktywuj kartę w panelu kart przed doładowaniem.
+            </p>
+            <p *ngIf="selectedJuniorForTopUp().prepaid_card_status === 'ACTIVE'" class="text-xs text-emerald-400 font-semibold mt-1">✓ Karta aktywna</p>
+          </div>
+        </div>
+        <ng-template #noCardBlock>
+          <div class="bg-bank-bg border border-bank-border rounded-xl p-4 mb-5 text-sm text-zinc-400">Brak karty prepaid przypisanej do konta dziecka.</div>
+        </ng-template>
+      </div>
+
+      <form [formGroup]="topUpForm" (ngSubmit)="submitTopUp()" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-400 mb-2">Kwota (PLN)</label>
+          <div class="flex gap-3">
+            <input formControlName="amount" type="number" step="0.01" min="0.01"
+                   class="input-field py-3 text-xl font-medium flex-1" placeholder="0.00">
+            <div class="w-20 bg-bank-bg border border-bank-border rounded-lg flex items-center justify-center text-base font-bold text-gray-400">PLN</div>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">Kwota zostanie pobrana z Twojego konta głównego.</p>
+        </div>
+
+        <div *ngIf="topUpError()" class="px-4 py-3 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm">{{ topUpError() }}</div>
+        <div *ngIf="topUpSuccess()" class="px-4 py-3 bg-brand/10 border border-brand/30 rounded-xl text-brand text-sm flex items-center gap-2">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          {{ topUpSuccess() }}
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" (click)="closeTopUpModal()" class="flex-1 btn-secondary py-3 rounded-xl">Anuluj</button>
+          <button type="submit" [disabled]="topUpForm.invalid || topUpLoading()"
+                  class="flex-1 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                  [ngClass]="topUpMode() === 'card' ? 'bg-yellow-400 hover:bg-yellow-300 text-black' : 'btn-primary'">
+            <svg *ngIf="topUpLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            {{ topUpLoading() ? 'Przetwarzanie...' : (topUpMode() === 'card' ? 'Doładuj kartę' : 'Wyślij przelew') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Zatwierdzanie wniosku przelewowego od dziecka -->
+<div *ngIf="showTransferApprovalModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="w-full max-w-md bg-bank-card border border-zinc-700/60 rounded-2xl shadow-2xl p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-bold text-zinc-100 flex items-center gap-2">
+        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+        Wniosek przelewowy
+      </h2>
+      <button (click)="showTransferApprovalModal.set(false)" class="text-zinc-400 hover:text-zinc-200">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div *ngIf="selectedTransferRequest()" class="flex flex-col gap-3 mb-5">
+      <div class="bg-zinc-800/60 rounded-xl p-4 flex flex-col gap-2 border border-zinc-700/40">
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-zinc-400 uppercase tracking-wider">Od dziecka</span>
+          <span class="text-sm font-bold text-zinc-100">{{ selectedTransferRequest().junior_name }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-zinc-400 uppercase tracking-wider">Do</span>
+          <span class="text-sm font-semibold text-zinc-200">{{ selectedTransferRequest().recipient_name }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-zinc-400 uppercase tracking-wider">IBAN</span>
+          <span class="text-xs font-mono text-zinc-300">{{ selectedTransferRequest().recipient_iban }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-zinc-400 uppercase tracking-wider">Tytuł</span>
+          <span class="text-sm text-zinc-300">{{ selectedTransferRequest().title }}</span>
+        </div>
+        <div class="border-t border-zinc-700/40 pt-2 flex justify-between items-center">
+          <span class="text-xs text-zinc-400 uppercase tracking-wider">Kwota</span>
+          <span class="text-xl font-bold text-yellow-400">{{ selectedTransferRequest().amount }} PLN</span>
+        </div>
+      </div>
+
+      <div *ngIf="transferApprovalError()" class="px-4 py-3 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm">
+        {{ transferApprovalError() }}
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button (click)="rejectTransferRequest()" [disabled]="transferApprovalLoading()"
+              class="flex-1 py-3 rounded-xl font-bold text-sm bg-red-900/30 border border-red-700/40 text-red-400 hover:bg-red-900/50 transition-colors flex items-center justify-center gap-2">
+        <svg *ngIf="!transferApprovalLoading()" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        Odrzuć
+      </button>
+      <button (click)="approveTransferRequest()" [disabled]="transferApprovalLoading()"
+              class="flex-1 py-3 rounded-xl font-bold text-sm btn-primary flex items-center justify-center gap-2">
+        <svg *ngIf="transferApprovalLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        <svg *ngIf="!transferApprovalLoading()" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Zatwierdź
+      </button>
+    </div>
   </div>
 </div>
 

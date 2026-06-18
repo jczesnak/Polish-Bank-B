@@ -34,8 +34,10 @@ services:
     volumes:
       - ./src:/app/src
     networks:
-      - default
-      - cards-backend  # Podpięcie do sieci systemu kart
+      default:
+      cards-backend:
+        aliases:
+          - polish-bank-b
 
   kafka_consumer:
     build:

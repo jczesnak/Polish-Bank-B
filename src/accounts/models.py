@@ -67,3 +67,43 @@ class Account(models.Model):
         check_digits_str = f"{check_digits:02d}"
         
         return f"PL{check_digits_str}{bban}"
+
+class JuniorTransferRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Oczekuje'
+        APPROVED = 'APPROVED', 'Zatwierdzone'
+        REJECTED = 'REJECTED', 'Odrzucone'
+
+    junior_account = models.ForeignKey(
+        'Account', on_delete=models.CASCADE, related_name='transfer_requests'
+    )
+    parent_account = models.ForeignKey(
+        'Account', on_delete=models.CASCADE, related_name='junior_transfer_requests_to_review'
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    recipient_iban = models.CharField(max_length=34)
+    recipient_name = models.CharField(max_length=200)
+    title = models.CharField(max_length=200)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'junior_transfer_requests'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.junior_account} → {self.recipient_iban} ({self.amount} PLN) [{self.status}]"
+
+
+class JuniorProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='junior_profile')
+    parent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='children')
+    daily_limit = models.DecimalField(max_digits=10, decimal_places=2, default=100.00)
+    blik_limit = models.DecimalField(max_digits=10, decimal_places=2, default=50.00)
+
+    class Meta:
+        db_table = 'junior_profiles'
+
+    def __str__(self):
+        return f"Junior: {self.user.email} (Parent: {self.parent.email})"

@@ -15,6 +15,8 @@ export interface BlikTransaction {
   status: string;
   created_at: string;
   merchant_name: string;
+  needs_parent_auth?: boolean;
+  junior_user_name?: string;
 }
 
 @Component({
@@ -56,7 +58,10 @@ export class LayoutComponent {
         const pending = txs.find(t => t.status === 'PENDING');
         if (pending && !this.pendingBlikTransaction()) {
           this.pendingBlikTransaction.set(pending);
-          this.notifSvc.add(`Oczekująca płatność BLIK: ${pending.amount} PLN`, 'in');
+          const msg = pending.needs_parent_auth && pending.junior_user_name
+            ? `Nowa transakcja BLIK do potwierdzenia z konta Junior ${pending.junior_user_name}: ${pending.amount} PLN`
+            : `Oczekująca płatność BLIK: ${pending.amount} PLN`;
+          this.notifSvc.add(msg, 'in');
         } else if (!pending && this.pendingBlikTransaction()) {
           this.pendingBlikTransaction.set(null);
           this.showBlikModal.set(false);

@@ -27,13 +27,21 @@ class BlikPingSerializer(serializers.Serializer):
 
 
 class BlikTransactionSerializer(serializers.ModelSerializer):
+    junior_user_name = serializers.SerializerMethodField()
+
     class Meta:
         model = BlikTransaction
         fields = [
             'id', 'klik_transaction_id', 'amount', 'currency',
             'merchant_name', 'status', 'reject_reason', 'created_at', 'completed_at',
+            'needs_parent_auth', 'junior_user_name',
         ]
         read_only_fields = fields
+
+    def get_junior_user_name(self, obj):
+        if obj.needs_parent_auth:
+            return obj.user.first_name
+        return None
 
 
 # --- P2P (przelew na telefon) --------------------------------------------
