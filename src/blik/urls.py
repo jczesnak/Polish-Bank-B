@@ -10,11 +10,15 @@ from .views import (
     P2PTransferView,
     P2PContactView,
     P2PContactDeleteView,
+    BlikTransactionAuthorizeView,
+    BlikTransactionRejectView,
 )
 
 urlpatterns = [
     path('blik/generate/', BlikGenerateView.as_view(), name='blik-generate'),
     path('blik/transactions/', BlikTransactionListView.as_view(), name='blik-transactions'),
+    path('blik/transactions/<uuid:pk>/authorize/', BlikTransactionAuthorizeView.as_view(), name='blik-transaction-authorize'),
+    path('blik/transactions/<uuid:pk>/reject/', BlikTransactionRejectView.as_view(), name='blik-transaction-reject'),
 
     # Webhooki od KLIK. KLIK woła {webhook_url}/authorize oraz {webhook_url}/ping
     # BEZ końcowego slasha, więc rejestrujemy warianty bez slasha (operator

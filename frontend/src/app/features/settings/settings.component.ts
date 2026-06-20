@@ -55,6 +55,11 @@ export class SettingsComponent implements OnInit {
     { validators: passwordMatchValidator },
   );
 
+  pinSetupForm = this.fb.group({ pin: ['', [Validators.required, Validators.pattern('^[0-9]{4}$')]] });
+  pinSetupLoading = signal(false);
+  pinSetupSuccess = signal('');
+  pinSetupError = signal('');
+
   ngOnInit() {
     const user = this.auth.user();
     if (user) {
@@ -162,6 +167,26 @@ export class SettingsComponent implements OnInit {
           typeof data === 'object' ? Object.values(data).flat().join(' ') : 'Błąd zmiany hasła.',
         );
       },
+    });
+  }
+
+  submitPinSetup() {
+    if (this.pinSetupForm.invalid) return;
+    this.pinSetupLoading.set(true);
+    this.pinSetupError.set('');
+    this.pinSetupSuccess.set('');
+
+    this.http.post('/api/auth/pin/', this.pinSetupForm.value).subscribe({
+      next: () => {
+        this.pinSetupLoading.set(false);
+        this.pinSetupSuccess.set('PIN BLIK został pomyślnie ustawiony/zmieniony.');
+        this.pinSetupForm.reset();
+        setTimeout(() => this.pinSetupSuccess.set(''), 5000);
+      },
+      error: (err) => {
+        this.pinSetupLoading.set(false);
+        this.pinSetupError.set(err.error?.pin || err.error?.detail || 'Błąd ustawiania PINu.');
+      }
     });
   }
 }

@@ -1,0 +1,680 @@
+<div class="min-h-screen w-full flex font-sans"
+     style="background: linear-gradient(135deg, #c8f7f3 0%, #fde8f5 40%, #fef9c3 100%); font-family: 'Nunito', 'Comic Sans MS', cursive, sans-serif;">
+
+  <!-- Sidebar -->
+  <aside class="w-60 flex-shrink-0 flex flex-col relative overflow-hidden"
+         style="background: rgba(255,255,255,0.92); border-right: 4px solid #f9a8d4; box-shadow: 4px 0 0 #fbbf24;">
+
+    <!-- Pixel fox dekoracja -->
+    <div class="absolute -bottom-2 -right-2 opacity-20 pointer-events-none select-none" style="transform: rotate(-10deg)">
+      <svg width="80" height="80" viewBox="0 0 16 16" style="image-rendering:pixelated">
+        <rect x="1" y="3" width="3" height="4" fill="#f97316"/>
+        <rect x="12" y="3" width="3" height="4" fill="#f97316"/>
+        <rect x="2" y="1" width="2" height="3" fill="#fbbf24"/>
+        <rect x="12" y="1" width="2" height="3" fill="#fbbf24"/>
+        <rect x="3" y="4" width="10" height="8" fill="#f97316"/>
+        <rect x="2" y="6" width="12" height="6" fill="#f97316"/>
+        <rect x="4" y="7" width="2" height="2" fill="#fff"/>
+        <rect x="10" y="7" width="2" height="2" fill="#fff"/>
+        <rect x="4" y="7" width="2" height="2" fill="#1e1b4b"/>
+        <rect x="10" y="7" width="2" height="2" fill="#1e1b4b"/>
+        <rect x="5" y="11" width="6" height="1" fill="#fde68a"/>
+        <rect x="6" y="10" width="4" height="2" fill="#fde68a"/>
+      </svg>
+    </div>
+
+    <!-- Logo -->
+    <div class="px-5 py-6 flex items-center gap-3" style="border-bottom: 3px dashed #f9a8d4;">
+      <div class="w-10 h-10 flex items-center justify-center rounded-xl" style="background:#a78bfa; box-shadow: 0 4px 0 #7c3aed; border: 3px solid #7c3aed;">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6l3 6-3 6-3-6 3-6z" fill="currentColor"/>
+        </svg>
+      </div>
+      <div>
+        <span class="font-black text-lg" style="color:#7c3aed">Total</span><span class="font-black text-lg" style="color:#ec4899">Bank</span>
+        <p class="text-xs font-bold" style="color:#a78bfa">Konto Junior</p>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-2">
+      <div class="flex items-center gap-3 px-4 py-3 rounded-2xl font-black text-sm"
+           style="background:#ede9fe; color:#7c3aed; border: 3px solid #a78bfa; box-shadow: 0 3px 0 #7c3aed;">
+        <!-- Pixel cat icon -->
+        <svg width="20" height="20" viewBox="0 0 8 8" style="image-rendering:pixelated;flex-shrink:0">
+          <rect x="1" y="1" width="1" height="2" fill="#6d28d9"/>
+          <rect x="6" y="1" width="1" height="2" fill="#6d28d9"/>
+          <rect x="1" y="2" width="6" height="5" rx="1" fill="#a78bfa"/>
+          <rect x="2" y="4" width="1" height="1" fill="#1e1b4b"/>
+          <rect x="5" y="4" width="1" height="1" fill="#1e1b4b"/>
+          <rect x="3" y="5" width="2" height="1" fill="#f9a8d4"/>
+        </svg>
+        Moj Pulpit
+      </div>
+    </nav>
+
+    <!-- User info + logout -->
+    <div class="p-4" style="border-top: 3px dashed #f9a8d4;">
+      <div *ngIf="user()" class="px-3 py-3 mb-3 rounded-2xl" style="background:#fdf2f8; border: 2px solid #f9a8d4;">
+        <p class="text-sm font-black truncate" style="color:#be185d">{{ user()!.first_name }} {{ user()!.last_name }}</p>
+        <p class="text-xs font-bold truncate" style="color:#f472b6">{{ user()!.email }}</p>
+      </div>
+      <button (click)="logout()" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-2xl font-bold text-sm transition-all"
+              style="color:#be185d; border: 2px solid #fecdd3; background: #fff1f2;"
+              onmouseover="this.style.background='#fecdd3'" onmouseout="this.style.background='#fff1f2'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+        Wyloguj
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+    <!-- Header -->
+    <header class="px-8 flex items-center justify-between flex-shrink-0"
+            style="height:80px; background:rgba(255,255,255,0.85); border-bottom: 4px solid #fbbf24; box-shadow: 0 4px 0 #f59e0b;">
+      <div class="flex items-center gap-4">
+        <!-- Pixel rabbit dekoracja -->
+        <svg width="36" height="36" viewBox="0 0 12 12" style="image-rendering:pixelated">
+          <rect x="2" y="0" width="2" height="4" fill="#e879f9"/>
+          <rect x="8" y="0" width="2" height="4" fill="#e879f9"/>
+          <rect x="1" y="3" width="10" height="7" fill="#fae8ff"/>
+          <rect x="3" y="5" width="2" height="2" fill="#c026d3"/>
+          <rect x="7" y="5" width="2" height="2" fill="#c026d3"/>
+          <rect x="4" y="8" width="4" height="1" fill="#f9a8d4"/>
+          <rect x="3" y="1" width="1" height="3" fill="#fae8ff"/>
+          <rect x="8" y="1" width="1" height="3" fill="#fae8ff"/>
+        </svg>
+        <h1 class="text-2xl font-black" style="color:#7c3aed">
+          Czesc, {{ user()?.first_name }}!
+        </h1>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <!-- Przycisk przelewu -->
+        <button (click)="openTransferModal()"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm uppercase tracking-wide transition-all"
+                style="background:#a78bfa; color:white; border:3px solid #7c3aed; box-shadow:0 3px 0 #7c3aed;">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          Przelew
+        </button>
+        <!-- Dzwonek -->
+        <div class="relative">
+          <button (click)="showNotifications.set(!showNotifications())"
+                  class="relative w-11 h-11 rounded-2xl flex items-center justify-center font-black transition-all"
+                  style="background:#fef9c3; border: 3px solid #fbbf24; box-shadow: 0 3px 0 #f59e0b; color:#92400e;">
+            <span *ngIf="pendingBlikTx()" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white" style="background:#ef4444; border:2px solid white">!</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+          </button>
+
+          <div *ngIf="showNotifications()" class="fixed inset-0 z-40" (click)="showNotifications.set(false)"></div>
+          <div *ngIf="showNotifications()" class="absolute right-0 top-14 w-72 z-50 rounded-2xl overflow-hidden"
+               style="background:white; border:3px solid #fbbf24; box-shadow: 0 6px 0 #f59e0b;">
+            <div class="px-4 py-3 font-black text-sm" style="background:#fef9c3; color:#92400e; border-bottom:2px solid #fbbf24">Powiadomienia</div>
+            <div *ngIf="pendingBlikTx()" class="p-4 cursor-pointer" style="background:#fff7ed; border-bottom:2px solid #fed7aa;" (click)="showNotifications.set(false)">
+              <p class="font-black text-sm" style="color:#ea580c">Oczekuje platnosc BLIK!</p>
+              <p class="text-xs font-bold mt-1" style="color:#9a3412">{{ pendingBlikTx()?.merchant_name }} — {{ pendingBlikTx()?.amount }} PLN</p>
+            </div>
+            <div *ngIf="!pendingBlikTx()" class="px-4 py-6 text-center text-sm font-bold" style="color:#9ca3af">Brak powiadomien</div>
+          </div>
+        </div>
+
+        <!-- Avatar -->
+        <div *ngIf="user()" class="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white"
+             style="background:#ec4899; border:3px solid #be185d; box-shadow:0 3px 0 #be185d">
+          {{ user()!.first_name.charAt(0) }}{{ user()!.last_name.charAt(0) }}
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto p-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-12 gap-5 items-start">
+
+        <!-- ===== LEWA KOLUMNA: Karta ===== -->
+        <div class="lg:col-span-1 2xl:col-span-3 flex flex-col gap-4">
+          <h2 class="text-xs font-black uppercase tracking-widest px-1" style="color:#7c3aed">Moja Karta</h2>
+
+          <!-- Wizualizacja karty -->
+          <div *ngIf="card()" class="relative w-full aspect-[1.58/1] rounded-3xl p-5 flex flex-col justify-between overflow-hidden"
+               style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%); border: 4px solid #581c87; box-shadow: 0 8px 0 #581c87;">
+            <!-- Dekoracja pixel star -->
+            <div class="absolute top-2 right-3 opacity-30 pointer-events-none" style="line-height:1">
+              <svg width="32" height="32" viewBox="0 0 8 8" style="image-rendering:pixelated">
+                <rect x="3" y="0" width="2" height="2" fill="white"/>
+                <rect x="0" y="3" width="8" height="2" fill="white"/>
+                <rect x="3" y="6" width="2" height="2" fill="white"/>
+                <rect x="1" y="1" width="2" height="2" fill="white"/>
+                <rect x="5" y="1" width="2" height="2" fill="white"/>
+                <rect x="1" y="5" width="2" height="2" fill="white"/>
+                <rect x="5" y="5" width="2" height="2" fill="white"/>
+              </svg>
+            </div>
+
+            <div class="flex justify-between items-start text-white">
+              <div>
+                <p class="text-xs font-black uppercase tracking-widest opacity-80">TOTAL BANK</p>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1" style="background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4)">Junior Prepaid</span>
+              </div>
+              <div *ngIf="card().status === 'REQUESTED' || card().status === 'PRODUCING'" class="text-[10px] font-black px-2 py-1 rounded-full uppercase" style="background:#fbbf24; color:#78350f; border:2px solid #f59e0b">Oczekuje</div>
+              <div *ngIf="card().status === 'SHIPPED'" class="text-[10px] font-black px-2 py-1 rounded-full uppercase" style="background:#60a5fa; color:#1e3a8a; border:2px solid #3b82f6">Do aktywacji</div>
+            </div>
+
+            <div class="text-white">
+              <div class="font-mono font-bold text-xl tracking-[0.3em] mb-3" style="letter-spacing:0.3em">
+                &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; {{ card().masked_number.slice(-4) }}
+              </div>
+              <div class="flex justify-between items-end">
+                <span class="text-xs font-black uppercase tracking-widest">{{ user()?.first_name }} {{ user()?.last_name }}</span>
+                <div *ngIf="card().balance != null" class="text-right">
+                  <p class="text-[10px] opacity-70 uppercase tracking-widest">Saldo</p>
+                  <p class="font-black text-base">{{ card().balance | number:'1.2-2' }} PLN</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="!card()" class="w-full aspect-[1.58/1] rounded-3xl flex flex-col items-center justify-center"
+               style="background:white; border:4px dashed #c4b5fd; box-shadow: 0 6px 0 #c4b5fd;">
+            <!-- Pixel sleeping cat -->
+            <svg width="48" height="48" viewBox="0 0 12 12" style="image-rendering:pixelated" class="mb-3">
+              <rect x="2" y="1" width="1" height="2" fill="#a78bfa"/>
+              <rect x="9" y="1" width="1" height="2" fill="#a78bfa"/>
+              <rect x="1" y="2" width="10" height="7" fill="#ddd6fe"/>
+              <rect x="3" y="5" width="2" height="1" fill="#6d28d9"/>
+              <rect x="7" y="5" width="2" height="1" fill="#6d28d9"/>
+              <rect x="4" y="7" width="4" height="1" fill="#f9a8d4"/>
+            </svg>
+            <p class="font-black text-sm" style="color:#7c3aed">Karta jest w drodze...</p>
+          </div>
+
+          <!-- Dane karty -->
+          <div *ngIf="card()" class="flex flex-col gap-3">
+            <button (click)="toggleCardDetails()" [disabled]="cardDetailsLoading()"
+                    class="w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wider transition-all"
+                    style="background:#ede9fe; color:#7c3aed; border:3px solid #a78bfa; box-shadow:0 4px 0 #7c3aed;">
+              {{ cardDetailsLoading() ? 'Ladowanie...' : (showCardDetails() ? 'Ukryj dane' : 'Pokaz dane karty') }}
+            </button>
+            <p *ngIf="cardDetailsError()" class="text-xs font-bold text-center" style="color:#ef4444">{{ cardDetailsError() }}</p>
+
+            <div *ngIf="showCardDetails() && cardDetails()" class="rounded-3xl p-4 flex flex-col gap-3"
+                 style="background:white; border:3px solid #c4b5fd; box-shadow:0 4px 0 #a78bfa;">
+              <div>
+                <p class="text-xs font-black uppercase tracking-widest mb-1" style="color:#7c3aed">Numer karty</p>
+                <p class="font-mono font-black text-sm" style="color:#1e1b4b; letter-spacing:0.1em">{{ cardDetails().full_pan }}</p>
+              </div>
+              <div class="flex gap-6">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-widest mb-1" style="color:#7c3aed">Wazna do</p>
+                  <p class="font-mono font-black" style="color:#1e1b4b">{{ cardDetails().expiry_date }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-black uppercase tracking-widest mb-1" style="color:#7c3aed">CVV</p>
+                  <p class="font-mono font-black" style="color:#1e1b4b">{{ cardDetails().cvv }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wnioski przelewowe -->
+          <div class="rounded-3xl overflow-hidden"
+               style="background:white; border:4px solid #a78bfa; box-shadow:0 6px 0 #7c3aed;">
+            <div class="flex items-center justify-between px-4 py-3" style="border-bottom:3px dashed #ddd6fe;">
+              <div class="flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 10 10" style="image-rendering:pixelated;flex-shrink:0">
+                  <rect x="2" y="0" width="6" height="7" fill="#7c3aed"/>
+                  <rect x="1" y="1" width="8" height="6" fill="#a78bfa"/>
+                  <rect x="0" y="3" width="2" height="3" fill="#7c3aed"/>
+                  <rect x="8" y="3" width="2" height="3" fill="#7c3aed"/>
+                  <rect x="2" y="3" width="2" height="2" fill="#1e1b4b"/>
+                  <rect x="6" y="3" width="2" height="2" fill="#1e1b4b"/>
+                  <rect x="4" y="6" width="2" height="1" fill="#fbbf24"/>
+                  <rect x="3" y="8" width="2" height="2" fill="#7c3aed"/>
+                  <rect x="5" y="8" width="2" height="2" fill="#7c3aed"/>
+                </svg>
+                <h2 class="font-black text-xs uppercase tracking-wider" style="color:#5b21b6">Przelewy</h2>
+              </div>
+              <button (click)="openTransferModal()"
+                      class="text-[11px] font-black uppercase px-2.5 py-1 rounded-lg"
+                      style="background:#ede9fe; color:#7c3aed; border:2px solid #a78bfa;">
+                + Nowy
+              </button>
+            </div>
+
+            <div *ngIf="loadingTransferRequests()" class="flex items-center justify-center py-5">
+              <svg class="animate-spin w-5 h-5" style="color:#a78bfa" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+
+            <div *ngIf="!loadingTransferRequests() && transferRequests().length === 0"
+                 class="px-4 py-5 text-center">
+              <p class="font-bold text-xs" style="color:#a78bfa">Brak wniosków</p>
+            </div>
+
+            <div *ngIf="!loadingTransferRequests() && transferRequests().length > 0"
+                 style="max-height:260px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#a78bfa #ede9fe;">
+              <div *ngFor="let req of transferRequests()"
+                   class="px-4 py-3"
+                   style="border-bottom:2px dashed #ddd6fe;">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                         [style.background]="req.status === 'APPROVED' ? '#f0fdf4' : req.status === 'REJECTED' ? '#fff1f2' : '#fef9c3'"
+                         [style.border]="req.status === 'APPROVED' ? '2px solid #86efac' : req.status === 'REJECTED' ? '2px solid #fecdd3' : '2px solid #fbbf24'">
+                      <svg *ngIf="req.status === 'APPROVED'" class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                      <svg *ngIf="req.status === 'REJECTED'" class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                      <svg *ngIf="req.status === 'PENDING'" class="w-3.5 h-3.5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="font-black text-xs truncate" style="color:#1c1917">{{ req.recipient_name }}</p>
+                      <p class="text-[10px] font-bold truncate" style="color:#a8a29e">{{ req.title }}</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                    <p class="font-black text-xs" style="color:#1c1917">{{ req.amount }} <span style="color:#a8a29e">PLN</span></p>
+                    <p class="text-[10px] font-black" [ngClass]="requestStatusClass(req.status)">{{ req.status_display }}</p>
+                    <button *ngIf="req.status === 'REJECTED'"
+                            (click)="openTransferModal(req)"
+                            class="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg"
+                            style="background:#fef9c3; color:#92400e; border:1.5px solid #fbbf24; box-shadow:0 1px 0 #f59e0b;">
+                      Ponow
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ===== SRODKOWA KOLUMNA: Saldo + Historia ===== -->
+        <div class="lg:col-span-1 2xl:col-span-6 flex flex-col gap-5">
+
+          <!-- Saldo BLIK -->
+          <div class="rounded-3xl p-5 relative overflow-hidden"
+               style="background:white; border:4px solid #34d399; box-shadow:0 6px 0 #059669;">
+            <!-- Pixel frog dekoracja -->
+            <div class="absolute right-4 top-3 opacity-25 pointer-events-none">
+              <svg width="52" height="52" viewBox="0 0 10 10" style="image-rendering:pixelated">
+                <rect x="0" y="2" width="3" height="3" fill="#4ade80"/>
+                <rect x="7" y="2" width="3" height="3" fill="#4ade80"/>
+                <rect x="1" y="0" width="2" height="2" fill="#4ade80"/>
+                <rect x="7" y="0" width="2" height="2" fill="#4ade80"/>
+                <rect x="2" y="3" width="6" height="5" fill="#4ade80"/>
+                <rect x="1" y="4" width="8" height="4" fill="#4ade80"/>
+                <rect x="2" y="4" width="2" height="2" fill="#fff"/>
+                <rect x="6" y="4" width="2" height="2" fill="#fff"/>
+                <rect x="2" y="4" width="2" height="2" fill="#166534"/>
+                <rect x="6" y="4" width="2" height="2" fill="#166534"/>
+                <rect x="4" y="7" width="2" height="1" fill="#bbf7d0"/>
+              </svg>
+            </div>
+
+            <p class="text-xs font-black uppercase tracking-widest mb-2" style="color:#059669">Kieszonkowe (BLIK)</p>
+            <div class="flex items-end gap-3">
+              <span class="text-5xl font-black" style="color:#065f46">{{ account()?.balance | number:'1.2-2' }}</span>
+              <span class="text-xl font-black pb-1" style="color:#34d399">PLN</span>
+            </div>
+          </div>
+
+          <!-- Historia BLIK -->
+          <div class="rounded-3xl overflow-hidden"
+               style="background:white; border:4px solid #fbbf24; box-shadow:0 6px 0 #d97706;">
+            <div class="flex items-center justify-between px-5 py-4" style="border-bottom:3px dashed #fde68a;">
+              <div class="flex items-center gap-3">
+                <!-- Pixel bear -->
+                <svg width="24" height="24" viewBox="0 0 8 8" style="image-rendering:pixelated">
+                  <rect x="0" y="1" width="2" height="2" fill="#92400e"/>
+                  <rect x="6" y="1" width="2" height="2" fill="#92400e"/>
+                  <rect x="1" y="2" width="6" height="5" fill="#d97706"/>
+                  <rect x="0" y="3" width="8" height="4" fill="#d97706"/>
+                  <rect x="2" y="4" width="1" height="1" fill="#431407"/>
+                  <rect x="5" y="4" width="1" height="1" fill="#431407"/>
+                  <rect x="3" y="5" width="2" height="2" fill="#fde68a"/>
+                  <rect x="3" y="6" width="2" height="1" fill="#431407"/>
+                </svg>
+                <h2 class="font-black text-sm uppercase tracking-wider" style="color:#92400e">Historia platnosci</h2>
+              </div>
+              <button (click)="loadHistory()" class="text-xs font-black uppercase px-3 py-1.5 rounded-xl transition-all"
+                      style="background:#fef9c3; color:#92400e; border:2px solid #fbbf24">Odswiez</button>
+            </div>
+
+            <div *ngIf="loadingHistory()" class="flex items-center justify-center py-10">
+              <svg class="animate-spin w-6 h-6" style="color:#fbbf24" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+
+            <div *ngIf="!loadingHistory() && history().length === 0" class="px-5 py-10 text-center">
+              <svg width="40" height="40" viewBox="0 0 10 10" style="image-rendering:pixelated;margin:0 auto 12px" class="opacity-30">
+                <rect x="1" y="2" width="8" height="6" fill="#d97706"/>
+                <rect x="2" y="1" width="6" height="1" fill="#d97706"/>
+                <rect x="3" y="4" width="4" height="1" fill="#fef9c3"/>
+                <rect x="3" y="6" width="4" height="1" fill="#fef9c3"/>
+              </svg>
+              <p class="font-black text-sm" style="color:#d97706">Brak transakcji</p>
+            </div>
+
+            <div *ngIf="!loadingHistory() && history().length > 0" style="max-height:360px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#fbbf24 #fef9c3;">
+              <div *ngFor="let tx of history()" class="flex items-center justify-between px-5 py-3.5 transition-colors"
+                   style="border-bottom:2px dashed #fde68a;" [style.background]="'transparent'"
+                   onmouseover="this.style.background='#fefce8'" onmouseout="this.style.background='transparent'">
+                <div class="flex items-center gap-3">
+                  <!-- BLIK icon -->
+                  <div *ngIf="tx.type === 'blik'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#fef9c3; border:2px solid #fbbf24;">
+                    <svg class="w-4 h-4" style="color:#d97706" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <!-- Card icon -->
+                  <div *ngIf="tx.type === 'card'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#ede9fe; border:2px solid #a78bfa;">
+                    <svg class="w-4 h-4" style="color:#7c3aed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                    </svg>
+                  </div>
+                  <!-- Transfer out icon -->
+                  <div *ngIf="tx.type === 'transfer_out'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#fee2e2; border:2px solid #fca5a5;">
+                    <svg class="w-4 h-4" style="color:#dc2626" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                    </svg>
+                  </div>
+                  <!-- Transfer in icon -->
+                  <div *ngIf="tx.type === 'transfer_in'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#dcfce7; border:2px solid #86efac;">
+                    <svg class="w-4 h-4" style="color:#16a34a" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="font-black text-sm" style="color:#1c1917">
+                      <ng-container *ngIf="tx.type === 'blik'">{{ tx.merchant_name || 'Platnosc BLIK' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'card'">{{ tx.merchant_name || 'Platnosc karta' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'transfer_out'">{{ tx.recipient_name || tx.title || 'Przelew wychodzący' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'transfer_in'">{{ tx.recipient_name || tx.title || 'Przelew przychodzący' }}</ng-container>
+                    </p>
+                    <div class="flex items-center gap-2">
+                      <p class="text-xs font-bold" style="color:#a8a29e">{{ tx.created_at | date:'dd.MM.yyyy HH:mm' }}</p>
+                      <span class="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-full"
+                            [style.background]="tx.type === 'card' ? '#ede9fe' : tx.type === 'transfer_out' ? '#fee2e2' : tx.type === 'transfer_in' ? '#dcfce7' : '#fef9c3'"
+                            [style.color]="tx.type === 'card' ? '#7c3aed' : tx.type === 'transfer_out' ? '#dc2626' : tx.type === 'transfer_in' ? '#16a34a' : '#92400e'">
+                        {{ tx.type === 'card' ? 'Karta' : tx.type === 'transfer_out' ? 'Przelew' : tx.type === 'transfer_in' ? 'Wpływ' : 'BLIK' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <p class="font-black text-sm" [style.color]="tx.type === 'transfer_in' ? '#16a34a' : '#1c1917'">
+                    {{ tx.type === 'transfer_in' ? '+' : '-' }}{{ tx.amount }} <span class="text-xs" style="color:#a8a29e">PLN</span>
+                  </p>
+                  <p class="text-xs font-black" [ngClass]="statusClass(tx.status)">{{ statusLabel(tx.status) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== PRAWA KOLUMNA: BLIK + PIN ===== -->
+        <div class="lg:col-span-2 2xl:col-span-3 flex flex-col gap-5">
+
+          <!-- BLIK generator -->
+          <div class="rounded-3xl p-5"
+               style="background:white; border:4px solid #6ee7b7; box-shadow:0 6px 0 #10b981;">
+            <div class="flex items-center gap-3 mb-5">
+              <!-- Pixel dog -->
+              <svg width="28" height="28" viewBox="0 0 10 10" style="image-rendering:pixelated;flex-shrink:0">
+                <rect x="0" y="2" width="3" height="4" fill="#92400e"/>
+                <rect x="7" y="2" width="3" height="4" fill="#92400e"/>
+                <rect x="2" y="2" width="6" height="7" fill="#d97706"/>
+                <rect x="1" y="4" width="8" height="5" fill="#d97706"/>
+                <rect x="3" y="5" width="1" height="1" fill="#431407"/>
+                <rect x="6" y="5" width="1" height="1" fill="#431407"/>
+                <rect x="4" y="7" width="2" height="1" fill="#431407"/>
+                <rect x="2" y="2" width="2" height="2" fill="#78350f"/>
+                <rect x="6" y="2" width="2" height="2" fill="#78350f"/>
+              </svg>
+              <h2 class="font-black text-sm uppercase tracking-wider" style="color:#065f46">Kod BLIK</h2>
+            </div>
+
+            <button *ngIf="!blikCode() && !blikLoading()" (click)="generateBlik()"
+                    class="w-full py-3.5 rounded-2xl font-black text-base uppercase tracking-wider transition-all"
+                    style="background:#34d399; color:white; border:4px solid #10b981; box-shadow:0 5px 0 #059669;">
+              Generuj kod!
+            </button>
+
+            <div *ngIf="blikLoading()" class="flex justify-center py-4">
+              <svg class="animate-spin w-7 h-7" style="color:#10b981" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+
+            <div *ngIf="blikCode() && !blikLoading()" class="flex flex-col gap-3">
+              <div (click)="copyBlikCode()" class="w-full py-5 rounded-2xl cursor-pointer text-center transition-all"
+                   style="background:#f0fdf4; border:4px solid #6ee7b7; box-shadow:0 4px 0 #34d399;"
+                   onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                <p class="text-4xl font-black font-mono tracking-[0.3em]" style="color:#065f46">{{ blikCode() }}</p>
+                <p class="text-xs font-black uppercase tracking-widest mt-2" style="color:#34d399">Kliknij aby skopiowac</p>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2 rounded-xl" style="background:#f0fdf4; border:2px solid #6ee7b7;">
+                <span class="text-xs font-black uppercase" style="color:#065f46">Wazny przez</span>
+                <span class="font-black font-mono" [ngClass]="blikTimeLeft() < 30 ? 'text-red-500' : ''" [style.color]="blikTimeLeft() >= 30 ? '#065f46' : ''">{{ blikTimeLeft() }}s</span>
+              </div>
+            </div>
+
+            <p *ngIf="blikError()" class="mt-3 text-sm font-bold text-center" style="color:#ef4444">{{ blikError() }}</p>
+          </div>
+
+          <!-- PIN BLIK -->
+          <div class="rounded-3xl p-5"
+               style="background:white; border:4px solid #f9a8d4; box-shadow:0 6px 0 #ec4899;">
+            <div class="flex items-center gap-3 mb-5">
+              <!-- Pixel cat -->
+              <svg width="28" height="28" viewBox="0 0 10 10" style="image-rendering:pixelated;flex-shrink:0">
+                <rect x="1" y="0" width="2" height="3" fill="#e879f9"/>
+                <rect x="7" y="0" width="2" height="3" fill="#e879f9"/>
+                <rect x="1" y="2" width="8" height="7" fill="#fae8ff"/>
+                <rect x="0" y="4" width="10" height="5" fill="#fae8ff"/>
+                <rect x="3" y="5" width="1" height="1" fill="#86198f"/>
+                <rect x="6" y="5" width="1" height="1" fill="#86198f"/>
+                <rect x="4" y="7" width="2" height="1" fill="#f9a8d4"/>
+                <rect x="2" y="1" width="1" height="2" fill="#fae8ff"/>
+                <rect x="7" y="1" width="1" height="2" fill="#fae8ff"/>
+              </svg>
+              <h2 class="font-black text-sm uppercase tracking-wider" style="color:#be185d">PIN do BLIK</h2>
+            </div>
+
+            <form [formGroup]="setPinForm" (ngSubmit)="setPin()" class="flex flex-col gap-3">
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest mb-2" style="color:#be185d">Nowy PIN (4 cyfry)</label>
+                <input formControlName="pin" type="password" maxlength="4" inputmode="numeric"
+                       class="w-full text-center text-2xl font-mono py-3 rounded-2xl outline-none tracking-[1em] transition-all"
+                       style="background:#fdf2f8; border:3px solid #f9a8d4; color:#be185d; font-weight:900;"
+                       placeholder="....">
+              </div>
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest mb-2" style="color:#be185d">Powtorz PIN</label>
+                <input formControlName="pin_confirm" type="password" maxlength="4" inputmode="numeric"
+                       class="w-full text-center text-2xl font-mono py-3 rounded-2xl outline-none tracking-[1em] transition-all"
+                       style="background:#fdf2f8; border:3px solid #f9a8d4; color:#be185d; font-weight:900;"
+                       placeholder="....">
+              </div>
+              <div *ngIf="setPinError()" class="px-3 py-2 rounded-2xl text-sm font-bold" style="background:#fff1f2; color:#be185d; border:2px solid #fecdd3">{{ setPinError() }}</div>
+              <div *ngIf="setPinSuccess()" class="px-3 py-2 rounded-2xl text-sm font-black flex items-center gap-2" style="background:#f0fdf4; color:#15803d; border:2px solid #86efac">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                PIN zapisany!
+              </div>
+              <button type="submit" [disabled]="setPinForm.invalid || setPinLoading()"
+                      class="w-full py-3 rounded-2xl font-black text-white text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                      style="background:#ec4899; border:3px solid #be185d; box-shadow:0 4px 0 #be185d;">
+                <svg *ngIf="setPinLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                {{ setPinLoading() ? 'Zapisywanie...' : 'Zapisz PIN' }}
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Modal: Nowy przelew -->
+<div *ngIf="showTransferModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+     style="background:rgba(0,0,0,0.5); backdrop-filter:blur(8px)">
+  <div class="w-full max-w-md rounded-3xl p-7 relative"
+       style="background:white; border:5px solid #a78bfa; box-shadow:0 10px 0 #7c3aed; font-family:'Nunito',cursive">
+
+    <button (click)="closeTransferModal()" class="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center font-black"
+            style="background:#ede9fe; color:#7c3aed; border:2px solid #a78bfa;">✕</button>
+
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center"
+           style="background:#ede9fe; border:3px solid #a78bfa; box-shadow:0 3px 0 #7c3aed;">
+        <svg class="w-6 h-6" style="color:#7c3aed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="text-xl font-black" style="color:#5b21b6">Wyslij przelew</h2>
+        <p class="text-xs font-bold" style="color:#a78bfa">Rodzic musi zatwierdz</p>
+      </div>
+    </div>
+
+    <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="flex flex-col gap-4">
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Kwota (PLN)</label>
+        <input formControlName="amount" type="number" min="0.01" step="0.01"
+               class="w-full py-3 px-4 rounded-2xl font-black outline-none transition-all"
+               style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;"
+               placeholder="0.00">
+      </div>
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Numer IBAN odbiorcy</label>
+        <input formControlName="recipient_iban" type="text"
+               class="w-full py-3 px-4 rounded-2xl font-mono font-bold outline-none transition-all"
+               style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;"
+               placeholder="PL00 0000 0000 0000 0000 0000 0000">
+      </div>
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Nazwa odbiorcy</label>
+        <input formControlName="recipient_name" type="text"
+               class="w-full py-3 px-4 rounded-2xl font-bold outline-none transition-all"
+               style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;"
+               placeholder="Jan Kowalski">
+      </div>
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Tytul przelewu</label>
+        <input formControlName="title" type="text"
+               class="w-full py-3 px-4 rounded-2xl font-bold outline-none transition-all"
+               style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;"
+               placeholder="np. Za urodziny">
+      </div>
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Rodzaj przelewu</label>
+        <select formControlName="system_route"
+                class="w-full py-3 px-4 rounded-2xl font-bold outline-none transition-all"
+                style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;">
+          <option value="INTERNAL">Wewnętrzny (w naszym banku)</option>
+          <option value="ELIXIR">Elixir (inny bank, standardowy)</option>
+          <option value="EXPRESS_ELIXIR">Express Elixir (inny bank, ekspresowy)</option>
+          <option value="SORBNET">Sorbnet (duże kwoty)</option>
+        </select>
+      </div>
+
+      <div *ngIf="transferError()" class="rounded-2xl px-4 py-3 text-sm font-bold"
+           style="background:#fff1f2; color:#be185d; border:2px solid #fecdd3">{{ transferError() }}</div>
+
+      <div *ngIf="transferSuccess()" class="rounded-2xl px-4 py-3 text-sm font-black flex items-center gap-2"
+           style="background:#f0fdf4; color:#15803d; border:2px solid #86efac">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        {{ transferSuccess() }}
+      </div>
+
+      <div class="flex gap-3 mt-1">
+        <button type="button" (click)="closeTransferModal()"
+                class="flex-1 py-3 rounded-2xl font-black transition-all"
+                style="background:#f5f3ff; color:#7c3aed; border:3px solid #c4b5fd;">
+          Anuluj
+        </button>
+        <button type="submit" [disabled]="transferForm.invalid || transferLoading()"
+                class="flex-1 py-3 rounded-2xl font-black text-white flex items-center justify-center gap-2 transition-all"
+                style="background:#a78bfa; border:3px solid #7c3aed; box-shadow:0 4px 0 #7c3aed;">
+          <svg *ngIf="transferLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          {{ transferLoading() ? 'Wysylanie...' : 'Wyslij wniosek' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Potwierdz platnosc BLIK -->
+<div *ngIf="pendingBlikTx()" class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+     style="background:rgba(0,0,0,0.5); backdrop-filter:blur(8px)">
+  <div class="w-full max-w-sm rounded-3xl p-7 flex flex-col items-center text-center relative"
+       style="background:white; border:5px solid #fbbf24; box-shadow:0 10px 0 #f59e0b; font-family:'Nunito',cursive">
+
+    <!-- Pixel duck icon -->
+    <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style="background:#fef9c3; border:4px solid #fbbf24; box-shadow:0 4px 0 #f59e0b;">
+      <svg width="36" height="36" viewBox="0 0 10 10" style="image-rendering:pixelated">
+        <rect x="3" y="0" width="4" height="3" fill="#fbbf24"/>
+        <rect x="7" y="1" width="2" height="2" fill="#fbbf24"/>
+        <rect x="1" y="3" width="8" height="5" fill="#fbbf24"/>
+        <rect x="0" y="5" width="10" height="3" fill="#fbbf24"/>
+        <rect x="4" y="1" width="1" height="1" fill="#1c1917"/>
+        <rect x="7" y="2" width="2" height="1" fill="#f97316"/>
+      </svg>
+    </div>
+
+    <h2 class="text-2xl font-black mb-1" style="color:#92400e">Platnosc BLIK!</h2>
+    <p class="text-sm font-bold mb-5" style="color:#a8a29e">Sklep chce pobrac pieniadze</p>
+
+    <div class="w-full rounded-2xl p-4 mb-5 text-left" style="background:#fef9c3; border:3px solid #fbbf24;">
+      <p class="text-xs font-black uppercase tracking-widest mb-1" style="color:#92400e">Kwota</p>
+      <p class="text-3xl font-black mb-3" style="color:#1c1917">{{ pendingBlikTx()?.amount }} <span class="text-base" style="color:#f59e0b">PLN</span></p>
+      <p class="text-xs font-black uppercase tracking-widest mb-1" style="color:#92400e">Sklep</p>
+      <p class="text-base font-black" style="color:#1c1917">{{ pendingBlikTx()?.merchant_name || 'Sklep BLIK' }}</p>
+    </div>
+
+    <form [formGroup]="blikPinForm" (ngSubmit)="authorizeBlik()" class="w-full">
+      <label class="block text-xs font-black uppercase tracking-widest mb-2" style="color:#92400e">Wpisz swoj PIN</label>
+      <input formControlName="pin" type="password" maxlength="4"
+             class="w-full text-center text-3xl font-mono py-3 rounded-2xl mb-3 outline-none tracking-[1em]"
+             style="background:#fef9c3; border:3px solid #fbbf24; color:#92400e; font-weight:900"
+             placeholder="....">
+
+      <div *ngIf="blikPinError()" class="rounded-2xl px-3 py-2 mb-3 text-sm font-bold" style="background:#fff1f2; color:#be185d; border:2px solid #fecdd3">{{ blikPinError() }}</div>
+
+      <div class="flex gap-3">
+        <button type="button" (click)="rejectBlik()" [disabled]="blikPinLoading()"
+                class="flex-1 py-3 rounded-2xl font-black text-white transition-all"
+                style="background:#f87171; border:3px solid #ef4444; box-shadow:0 4px 0 #dc2626;">
+          Nie
+        </button>
+        <button type="submit" [disabled]="blikPinForm.invalid || blikPinLoading()"
+                class="flex-1 py-3 rounded-2xl font-black text-white transition-all flex items-center justify-center gap-2"
+                style="background:#34d399; border:3px solid #10b981; box-shadow:0 4px 0 #059669;">
+          <svg *ngIf="blikPinLoading()" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          TAK!
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

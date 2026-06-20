@@ -88,6 +88,45 @@ export class DashboardComponent implements OnInit {
   cards = signal<any[]>([]);
   loadingCards = signal(false);
   currentCardIndex = signal(0);
+  
+  juniors = signal<any[]>([]);
+  loadingJuniors = signal(false);
+  showJuniorModal = signal(false);
+  selectedJunior = signal<any>(null);
+
+  juniorTransferRequests = signal<any[]>([]);
+  showTransferApprovalModal = signal(false);
+  selectedTransferRequest = signal<any>(null);
+  transferApprovalLoading = signal(false);
+  transferApprovalError = signal('');
+  
+  juniorLimitsForm = this.fb.group({
+    daily_limit: ['', Validators.required],
+    blik_limit: ['', Validators.required],
+  });
+
+  showCreateJuniorModal = signal(false);
+  createJuniorLoading = signal(false);
+  createJuniorError = signal('');
+  createJuniorForm = this.fb.group({
+    first_name: ['', Validators.required],
+    last_name: ['', Validators.required],
+    pesel: ['', [Validators.required, Validators.pattern('^[0-9]{11}$')]],
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
+    daily_limit: [100.00],
+    blik_limit: [50.00]
+  });
+
+  showTopUpModal = signal(false);
+  selectedJuniorForTopUp = signal<any>(null);
+  topUpMode = signal<'account' | 'card'>('account');
+  topUpLoading = signal(false);
+  topUpError = signal('');
+  topUpSuccess = signal('');
+  topUpForm = this.fb.group({
+    amount: ['', [Validators.required, Validators.min(0.01)]],
+  });
 
   nextCard() {
     const len = this.cards().length;
@@ -134,19 +173,32 @@ export class DashboardComponent implements OnInit {
   blikError = signal('');
   blikConfirmed = signal(false);
 
-  historyFilter = signal<'all' | 'out' | 'in'>('all');
+  pendingBlikTransaction = signal<BlikTransaction | null>(null);
+  blikAuthForm = this.fb.group({ pin: ['', [Validators.required, Validators.pattern('^[0-9]{4}$')]] });
+  blikAuthLoading = signal(false);
+  blikAuthError = signal('');
+
+  historyFilter = signal<'all' | 'out' | 'in' | 'card' | 'blik' | 'transfer'>('all');
 
   readonly historyFilters = [
     { key: 'all' as const, label: 'Wszystkie' },
     { key: 'out' as const, label: 'Wychodzące' },
     { key: 'in' as const, label: 'Przychodzące' },
+    { key: 'card' as const, label: 'Karty' },
+    { key: 'blik' as const, label: 'BLIK / P2P' },
+    { key: 'transfer' as const, label: 'Przelewy' },
   ];
 
   readonly filteredTransfers = computed(() => {
     const f = this.historyFilter();
     const all = this.allTransactions();
     if (f === 'all') return all;
-    return all.filter(t => t.direction === (f === 'in' ? 'IN' : 'OUT'));
+    if (f === 'out') return all.filter(t => t.direction === 'OUT');
+    if (f === 'in') return all.filter(t => t.direction === 'IN');
+    if (f === 'card') return all.filter(t => t.type === 'CARD');
+    if (f === 'blik') return all.filter(t => t.type === 'BLIK' || (t.type === 'TRANSFER' && (t.system_route_display === 'KLIK' || (t as any).system_route === 'KLIK')));
+    if (f === 'transfer') return all.filter(t => t.type === 'TRANSFER' && t.system_route_display !== 'KLIK' && (t as any).system_route !== 'KLIK');
+    return all;
   });
 
   readonly historyCounts = computed(() => {
@@ -155,6 +207,9 @@ export class DashboardComponent implements OnInit {
       all: all.length,
       out: all.filter(t => t.direction === 'OUT').length,
       in: all.filter(t => t.direction === 'IN').length,
+      card: all.filter(t => t.type === 'CARD').length,
+      blik: all.filter(t => t.type === 'BLIK' || (t.type === 'TRANSFER' && (t.system_route_display === 'KLIK' || (t as any).system_route === 'KLIK'))).length,
+      transfer: all.filter(t => t.type === 'TRANSFER' && t.system_route_display !== 'KLIK' && (t as any).system_route !== 'KLIK').length,
     };
   });
 
@@ -267,13 +322,248 @@ export class DashboardComponent implements OnInit {
     initial_balance: [0, [Validators.min(0)]],
   });
 
+  pollingInterval: any;
+
   ngOnInit() {
     this.loadAccounts();
     this.loadTransfers();
     this.loadBlikTransactions();
     this.loadCards();
+    this.loadJuniors();
+
+    this.loadJuniorTransferRequests();
+
+    // Start polling for new transactions and balance changes
+    this.pollingInterval = setInterval(() => {
+      this.loadAccounts(true);
+      this.loadTransfers(true);
+      this.loadCards();
+      this.loadJuniors(true);
+      this.loadJuniorTransferRequests();
+    }, 3000);
   }
 
+  loadJuniors(silent = false) {
+    if (!silent) this.loadingJuniors.set(true);
+    this.http.get<any[]>('/api/accounts/junior/').subscribe({
+      next: (data) => {
+        this.juniors.set(data);
+        if (!silent) this.loadingJuniors.set(false);
+      },
+      error: () => {
+        if (!silent) this.loadingJuniors.set(false);
+      }
+    });
+  }
+
+  loadJuniorTransferRequests() {
+    this.http.get<any[]>('/api/accounts/parent/transfer-requests/').subscribe({
+      next: (data) => {
+        const prev = this.juniorTransferRequests();
+        if (data.length > prev.length) {
+          this.notifSvc.add(`Nowy wniosek przelewowy od ${data[0]?.junior_name}`, 'out');
+        }
+        this.juniorTransferRequests.set(data);
+      },
+      error: () => {},
+    });
+  }
+
+  openTransferApproval(req: any) {
+    this.selectedTransferRequest.set(req);
+    this.transferApprovalError.set('');
+    this.showTransferApprovalModal.set(true);
+  }
+
+  approveTransferRequest() {
+    const req = this.selectedTransferRequest();
+    if (!req) return;
+    this.transferApprovalLoading.set(true);
+    this.transferApprovalError.set('');
+    this.http.post(`/api/accounts/parent/transfer-requests/${req.id}/approve/`, {}).subscribe({
+      next: () => {
+        this.transferApprovalLoading.set(false);
+        this.showTransferApprovalModal.set(false);
+        this.selectedTransferRequest.set(null);
+        this.notifSvc.add('Przelew zatwierdzony i wykonany!', 'in');
+        this.loadAccounts();
+        this.loadTransfers();
+        this.loadJuniorTransferRequests();
+      },
+      error: (err) => {
+        this.transferApprovalLoading.set(false);
+        this.transferApprovalError.set(err?.error?.detail || 'Błąd zatwierdzania.');
+      },
+    });
+  }
+
+  rejectTransferRequest() {
+    const req = this.selectedTransferRequest();
+    if (!req) return;
+    this.transferApprovalLoading.set(true);
+    this.http.post(`/api/accounts/parent/transfer-requests/${req.id}/reject/`, {}).subscribe({
+      next: () => {
+        this.transferApprovalLoading.set(false);
+        this.showTransferApprovalModal.set(false);
+        this.selectedTransferRequest.set(null);
+        this.notifSvc.add('Wniosek przelewowy odrzucony.', 'out');
+        this.loadJuniorTransferRequests();
+      },
+      error: () => {
+        this.transferApprovalLoading.set(false);
+      },
+    });
+  }
+
+  openJuniorModal(junior: any) {
+    this.selectedJunior.set(junior);
+    this.juniorLimitsForm.patchValue({
+      daily_limit: junior.daily_limit,
+      blik_limit: junior.blik_limit
+    });
+    this.showJuniorModal.set(true);
+  }
+  
+  closeJuniorModal() {
+    this.showJuniorModal.set(false);
+    this.selectedJunior.set(null);
+  }
+  
+  saveJuniorLimits() {
+    if (this.juniorLimitsForm.invalid || !this.selectedJunior()) return;
+    this.http.patch(`/api/accounts/junior/${this.selectedJunior().id}/`, this.juniorLimitsForm.value).subscribe({
+      next: () => {
+        this.notifSvc.add('Limity zapisane', 'in');
+        this.closeJuniorModal();
+        this.loadJuniors();
+      },
+      error: () => this.notifSvc.add('Błąd zapisu', 'out')
+    });
+  }
+
+  openCreateJuniorModal() {
+    this.showCreateJuniorModal.set(true);
+    this.createJuniorForm.reset({ daily_limit: 100, blik_limit: 50 });
+    this.createJuniorError.set('');
+  }
+
+  closeCreateJuniorModal() {
+    this.showCreateJuniorModal.set(false);
+  }
+
+  submitCreateJunior() {
+    if (this.createJuniorForm.invalid) return;
+    this.createJuniorLoading.set(true);
+    this.createJuniorError.set('');
+
+    this.http.post('/api/accounts/junior/', this.createJuniorForm.value).subscribe({
+      next: () => {
+        this.notifSvc.add('Konto Junior zostało pomyślnie utworzone!', 'in');
+        this.createJuniorLoading.set(false);
+        this.closeCreateJuniorModal();
+        this.loadJuniors();
+      },
+      error: (err) => {
+        this.createJuniorLoading.set(false);
+        const data = err?.error;
+        if (typeof data === 'object') {
+          this.createJuniorError.set(Object.values(data).flat().join(' '));
+        } else {
+          this.createJuniorError.set('Wystąpił błąd podczas tworzenia konta.');
+        }
+      }
+    });
+  }
+
+  openTopUpModal(junior: any) {
+    this.selectedJuniorForTopUp.set(junior);
+    this.topUpMode.set('account');
+    this.topUpForm.reset();
+    this.topUpError.set('');
+    this.topUpSuccess.set('');
+    this.showTopUpModal.set(true);
+  }
+
+  closeTopUpModal() {
+    this.showTopUpModal.set(false);
+    this.selectedJuniorForTopUp.set(null);
+  }
+
+  submitTopUp() {
+    if (this.topUpForm.invalid || !this.selectedJuniorForTopUp()) return;
+    this.topUpLoading.set(true);
+    this.topUpError.set('');
+    this.topUpSuccess.set('');
+
+    const url = this.topUpMode() === 'card'
+      ? `/api/accounts/junior/${this.selectedJuniorForTopUp().id}/topup-card/`
+      : `/api/accounts/junior/${this.selectedJuniorForTopUp().id}/topup/`;
+
+    this.http.post<any>(url, this.topUpForm.value).subscribe({
+      next: (res) => {
+        this.topUpLoading.set(false);
+        this.topUpSuccess.set(res.detail || 'Sukces!');
+        this.notifSvc.add(res.detail || 'Doładowanie Junior', 'in');
+        this.loadJuniors();
+        this.loadAccounts();
+        setTimeout(() => this.closeTopUpModal(), 1800);
+      },
+      error: (err) => {
+        this.topUpLoading.set(false);
+        const data = err?.error;
+        if (typeof data === 'object') {
+          this.topUpError.set(Object.values(data).flat().join(' '));
+        } else {
+          this.topUpError.set('Wystąpił błąd.');
+        }
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.pollingInterval) clearInterval(this.pollingInterval);
+    if (this.blikInterval) clearInterval(this.blikInterval);
+  }
+
+  authorizeBlikTransaction() {
+    if (this.blikAuthForm.invalid || !this.pendingBlikTransaction()) return;
+    this.blikAuthLoading.set(true);
+    this.blikAuthError.set('');
+
+    this.http.post(`/api/blik/transactions/${this.pendingBlikTransaction()?.id}/authorize/`, this.blikAuthForm.value).subscribe({
+      next: () => {
+        this.blikAuthLoading.set(false);
+        this.pendingBlikTransaction.set(null);
+        this.notifSvc.add('Transakcja BLIK autoryzowana pomyślnie!', 'in');
+        this.loadAccounts();
+        this.loadTransfers();
+      },
+      error: (err) => {
+        this.blikAuthLoading.set(false);
+        this.blikAuthError.set(err.error?.pin || err.error?.detail || 'Błąd autoryzacji.');
+      }
+    });
+  }
+
+  rejectBlikTransaction() {
+    if (!this.pendingBlikTransaction()) return;
+    this.blikAuthLoading.set(true);
+    this.blikAuthError.set('');
+
+    this.http.post(`/api/blik/transactions/${this.pendingBlikTransaction()?.id}/reject/`, {}).subscribe({
+      next: () => {
+        this.blikAuthLoading.set(false);
+        this.pendingBlikTransaction.set(null);
+        this.notifSvc.add('Transakcja BLIK została odrzucona.', 'out');
+        this.loadAccounts();
+        this.loadTransfers();
+      },
+      error: (err) => {
+        this.blikAuthLoading.set(false);
+        this.blikAuthError.set('Błąd odrzucania transakcji.');
+      }
+    });
+  }
 
   loadCards() {
     this.loadingCards.set(true);
@@ -404,23 +694,35 @@ export class DashboardComponent implements OnInit {
   }
 
 
-  loadBlikTransactions() {
-    this.loadingBlik.set(true);
+  loadBlikTransactions(silent = false) {
+    if (!silent) this.loadingBlik.set(true);
     this.http.get<BlikTransaction[]>('/api/blik/transactions/').pipe(catchError(() => of([]))).subscribe({
       next: (txs) => {
         this.blikTransactions.set(txs);
-        this.loadingBlik.set(false);
+        if (!silent) this.loadingBlik.set(false);
+
+        // Check for pending transactions
+        const pending = txs.find(t => t.status === 'PENDING');
+        if (pending && !this.pendingBlikTransaction()) {
+          this.pendingBlikTransaction.set(pending);
+          this.blikAuthForm.reset();
+        } else if (!pending && this.pendingBlikTransaction()) {
+          // It was authorized/rejected elsewhere or timed out
+          this.pendingBlikTransaction.set(null);
+        }
       },
-      error: () => this.loadingBlik.set(false),
+      error: () => {
+        if (!silent) this.loadingBlik.set(false);
+      },
     });
   }
 
-  private loadAccounts() {
-    this.loadingAccounts.set(true);
+  private loadAccounts(silent = false) {
+    if (!silent) this.loadingAccounts.set(true);
     this.http.get<Account[]>('/api/accounts/').subscribe({
       next: (accounts) => {
         this.accounts.set(accounts);
-        this.loadingAccounts.set(false);
+        if (!silent) this.loadingAccounts.set(false);
 
         const newBalance = accounts.reduce((s, a) => s + parseFloat(a.balance), 0);
         if (this.previousBalance >= 0 && newBalance > this.previousBalance) {
@@ -429,16 +731,18 @@ export class DashboardComponent implements OnInit {
         }
         this.previousBalance = newBalance;
 
-        if (accounts.length > 0) {
+        if (accounts.length > 0 && !this.transferForm.get('sender_account')?.value) {
           this.transferForm.patchValue({ sender_account: accounts[0].id });
         }
       },
-      error: () => this.loadingAccounts.set(false),
+      error: () => {
+        if (!silent) this.loadingAccounts.set(false);
+      },
     });
   }
 
-  private loadTransfers() {
-    this.loadingTransfers.set(true);
+  private loadTransfers(silent = false) {
+    if (!silent) this.loadingTransfers.set(true);
     forkJoin({
       outgoing: this.http.get<Transfer[]>('/api/transfers/').pipe(catchError(() => of([]))),
       incoming: this.http.get<Transfer[]>('/api/transfers/incoming/').pipe(catchError(() => of([]))),
@@ -451,32 +755,36 @@ export class DashboardComponent implements OnInit {
         outgoing.forEach(t => unified.push({
           id: t.id, type: 'TRANSFER', direction: 'OUT',
           amount: t.amount, currency: 'PLN', status: t.status, created_at: t.created_at,
-          title: t.title, recipient_name: t.recipient_name, system_route_display: t.system_route_display || t.system_route
+          title: t.title, recipient_name: t.recipient_name, system_route_display: t.system_route_display || t.system_route,
+          system_route: t.system_route
         }));
         
         incoming.forEach(t => unified.push({
           id: t.id, type: 'TRANSFER', direction: 'IN',
           amount: t.amount, currency: 'PLN', status: t.status, created_at: t.created_at,
-          title: t.title, sender_name: t.sender_name || t.sender_iban, system_route_display: t.system_route_display || t.system_route
+          title: t.title, sender_name: t.sender_name || t.sender_iban, system_route_display: t.system_route_display || t.system_route,
+          system_route: t.system_route
         }));
         
         blik.forEach(t => unified.push({
           id: String(t.id), type: 'BLIK', direction: 'OUT',
           amount: t.amount, currency: t.currency, status: t.status, created_at: t.created_at,
-          title: 'Płatność BLIK', merchant_name: t.merchant_name
+          title: 'Płatność BLIK', merchant_name: t.merchant_name, system_route: 'KLIK'
         }));
         
         cards.forEach(t => unified.push({
           id: String(t.id), type: 'CARD', direction: 'OUT',
           amount: t.amount, currency: t.currency, status: t.status, created_at: t.created_at,
-          title: 'Płatność Kartą', merchant_name: t.merchant_name
+          title: 'Płatność Kartą', merchant_name: t.merchant_name, system_route: 'CARD'
         }));
 
         const merged = unified.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         this.allTransactions.set(merged);
-        this.loadingTransfers.set(false);
+        if (!silent) this.loadingTransfers.set(false);
       },
-      error: () => this.loadingTransfers.set(false),
+      error: () => {
+        if (!silent) this.loadingTransfers.set(false);
+      },
     });
   }
 
@@ -538,6 +846,17 @@ export class DashboardComponent implements OnInit {
         this.blikError.set(err?.error?.detail ?? 'Błąd generowania kodu BLIK.');
       },
     });
+  }
+
+  copyBlikCode() {
+    const code = this.blikCode();
+    if (code) {
+      navigator.clipboard.writeText(code).then(() => {
+        this.notifSvc.add('Skopiowano kod BLIK do schowka', 'in');
+      }).catch(() => {
+        this.notifSvc.add('Nie udało się skopiować kodu', 'out');
+      });
+    }
   }
 
   submitTransfer() {

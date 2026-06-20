@@ -2,6 +2,7 @@ import re
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import generics, status
@@ -120,6 +121,11 @@ class BlikWebhookAuthorizeView(APIView):
             account.blocked_funds += amount
             account.save(update_fields=['blocked_funds'])
 
+            needs_parent_auth = False
+            if hasattr(blik_code.user, 'junior_profile'):
+                if amount > blik_code.user.junior_profile.blik_limit:
+                    needs_parent_auth = True
+
             transaction = BlikTransaction.objects.create(
                 klik_transaction_id=data['transaction_id'],
                 account=account,
@@ -127,39 +133,12 @@ class BlikWebhookAuthorizeView(APIView):
                 amount=amount,
                 currency=data['currency'],
                 merchant_name=data.get('merchant_name', ''),
+                needs_parent_auth=needs_parent_auth
             )
             self._finalize_code(blik_code)
 
-        # Potwierdzenie do KLIK (poza atomic — to call sieciowy)
-        try:
-            KlikService().confirm_payment(
-                transaction_id=str(data['transaction_id']),
-                decision='ACCEPTED',
-            )
-        except KlikError as exc:
-            with db_transaction.atomic():
-                account = Account.objects.select_for_update().get(pk=account.id)
-                account.blocked_funds -= amount
-                account.save(update_fields=['blocked_funds'])
-                transaction.status = BlikTransaction.Status.REJECTED
-                transaction.reject_reason = BlikTransaction.RejectReason.OTHER
-                transaction.completed_at = timezone.now()
-                transaction.save(update_fields=['status', 'reject_reason', 'completed_at'])
-            return Response(
-                {'detail': f'Błąd potwierdzenia w systemie KLIK: {exc.message}', 'code': exc.code},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
-        # KLIK potwierdził COMPLETED — finalizujemy: hold → faktyczne obciążenie.
-        with db_transaction.atomic():
-            account = Account.objects.select_for_update().get(pk=account.id)
-            account.blocked_funds -= amount
-            account.balance -= amount
-            account.save(update_fields=['blocked_funds', 'balance'])
-            transaction.status = BlikTransaction.Status.COMPLETED
-            transaction.completed_at = timezone.now()
-            transaction.save(update_fields=['status', 'completed_at'])
-
+        # Zamiast automatycznego potwierdzania do KLIKa,
+        # zostawiamy transakcję w statusie PENDING i czekamy na autoryzację PINem przez użytkownika.
         return Response({'received': True, 'will_prompt_user': True})
 
     @staticmethod
@@ -208,7 +187,11 @@ class BlikTransactionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return BlikTransaction.objects.filter(user=self.request.user)
+        user = self.request.user
+        return BlikTransaction.objects.filter(
+            Q(user=user) |
+            Q(user__junior_profile__parent=user, needs_parent_auth=True, status=BlikTransaction.Status.PENDING)
+        ).distinct()
 
 
 # --- P2P (przelew na telefon) --------------------------------------------
@@ -443,10 +426,108 @@ class P2PContactDeleteView(APIView):
     """Usunięcie kontaktu P2P."""
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, contact_id):
+    def delete(self, request, pk):
         try:
-            contact = P2pContact.objects.get(pk=contact_id, user=request.user)
+            contact = P2pContact.objects.get(pk=pk, user=request.user)
+            contact.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except P2pContact.DoesNotExist:
-            return Response({'detail': 'Kontakt nie istnieje.'}, status=status.HTTP_404_NOT_FOUND)
-        contact.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+class BlikTransactionAuthorizeView(APIView):
+    """Autoryzacja transakcji BLIK PINem po stronie banku."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        pin = request.data.get('pin', '')
+        if not request.user.blik_pin:
+            return Response({'detail': 'PIN BLIK nie został ustawiony.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        import django.contrib.auth.hashers as hashers
+        if not hashers.check_password(pin, request.user.blik_pin):
+            return Response({'pin': 'Niepoprawny PIN.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            transaction = BlikTransaction.objects.get(id=pk, status=BlikTransaction.Status.PENDING)
+            if transaction.needs_parent_auth:
+                if not hasattr(transaction.user, 'junior_profile') or transaction.user.junior_profile.parent != request.user:
+                    return Response({'detail': 'Brak uprawnień. Transakcja wymaga zgody rodzica.'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if transaction.user != request.user:
+                    return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
+        except BlikTransaction.DoesNotExist:
+            return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Potwierdzenie do KLIK
+        try:
+            KlikService().confirm_payment(
+                transaction_id=str(transaction.klik_transaction_id),
+                decision='ACCEPTED',
+            )
+        except KlikError as exc:
+            with db_transaction.atomic():
+                account = Account.objects.select_for_update().get(pk=transaction.account_id)
+                if account.blocked_funds >= transaction.amount:
+                    account.blocked_funds -= transaction.amount
+                    account.save(update_fields=['blocked_funds'])
+                transaction.status = BlikTransaction.Status.REJECTED
+                transaction.reject_reason = BlikTransaction.RejectReason.OTHER
+                transaction.completed_at = timezone.now()
+                transaction.save(update_fields=['status', 'reject_reason', 'completed_at'])
+            return Response(
+                {'detail': f'Błąd potwierdzenia w systemie KLIK: {exc.message}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Sukces - finalizujemy
+        with db_transaction.atomic():
+            account = Account.objects.select_for_update().get(pk=transaction.account_id)
+            if account.blocked_funds >= transaction.amount:
+                account.blocked_funds -= transaction.amount
+            account.balance -= transaction.amount
+            account.save(update_fields=['blocked_funds', 'balance'])
+            transaction.status = BlikTransaction.Status.COMPLETED
+            transaction.completed_at = timezone.now()
+            transaction.save(update_fields=['status', 'completed_at'])
+
+        return Response({'detail': 'Transakcja została pomyślnie zautoryzowana.'})
+
+
+class BlikTransactionRejectView(APIView):
+    """Odrzucenie transakcji BLIK przez użytkownika."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            transaction = BlikTransaction.objects.get(id=pk, status=BlikTransaction.Status.PENDING)
+            if transaction.needs_parent_auth:
+                if not hasattr(transaction.user, 'junior_profile') or transaction.user.junior_profile.parent != request.user:
+                    return Response({'detail': 'Brak uprawnień. Transakcja wymaga zgody rodzica.'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if transaction.user != request.user:
+                    return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
+        except BlikTransaction.DoesNotExist:
+            return Response({'detail': 'Transakcja nie istnieje lub nie oczekuje na autoryzację.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Informujemy KLIK o odrzuceniu
+        try:
+            KlikService().confirm_payment(
+                transaction_id=str(transaction.klik_transaction_id),
+                decision='REJECTED',
+            )
+        except KlikError:
+            pass # Ignorujemy ewentualne błędy przy odrzucaniu
+
+        # Cofamy hold
+        with db_transaction.atomic():
+            account = Account.objects.select_for_update().get(pk=transaction.account_id)
+            if account.blocked_funds >= transaction.amount:
+                account.blocked_funds -= transaction.amount
+                account.save(update_fields=['blocked_funds'])
+            transaction.status = BlikTransaction.Status.REJECTED
+            transaction.reject_reason = BlikTransaction.RejectReason.USER_DECLINED
+            transaction.completed_at = timezone.now()
+            transaction.save(update_fields=['status', 'reject_reason', 'completed_at'])
+
+        return Response({'detail': 'Transakcja została odrzucona.'})

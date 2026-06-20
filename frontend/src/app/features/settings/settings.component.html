@@ -170,5 +170,34 @@
         </button>
       </form>
     </div>
+
+    <div class="card p-7 shadow-[0_10px_40px_rgba(0,0,0,0.3)] mt-8">
+      <h2 class="text-xs font-semibold tracking-wider text-gray-400 uppercase mb-6">
+        Kod PIN do płatności BLIK
+      </h2>
+      <p class="text-sm text-gray-400 mb-6">Ustaw lub zmień 4-cyfrowy kod PIN, którym będziesz potwierdzać płatności BLIK w internecie i sklepach.</p>
+      <form [formGroup]="pinSetupForm" (ngSubmit)="submitPinSetup()">
+        <div class="mb-6">
+          <label class="label">Twój PIN BLIK</label>
+          <input formControlName="pin" type="password" maxlength="4" class="input-field text-3xl tracking-[1em] font-mono py-4"
+                 placeholder="••••" />
+          <p *ngIf="pinSetupForm.get('pin')?.touched && pinSetupForm.get('pin')?.hasError('pattern')"
+             class="mt-1.5 text-xs text-red-400 font-medium">PIN musi składać się z dokładnie 4 cyfr.</p>
+        </div>
+        
+        <div *ngIf="pinSetupSuccess()"
+             class="mb-5 p-3 bg-brand/10 border border-brand/30 rounded-lg text-brand text-sm font-medium">
+          {{ pinSetupSuccess() }}
+        </div>
+        <div *ngIf="pinSetupError()"
+             class="mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-medium">
+          {{ pinSetupError() }}
+        </div>
+        
+        <button type="submit" [disabled]="pinSetupLoading() || pinSetupForm.invalid" class="btn-primary w-full sm:w-auto px-8">
+          {{ pinSetupLoading() ? 'Zapisywanie...' : 'Zapisz PIN' }}
+        </button>
+      </form>
+    </div>
   </main>
 </div>
