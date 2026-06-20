@@ -103,7 +103,7 @@ class AccountDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         return Account.objects.filter(user=self.request.user)
 
-from django.db import transaction
+from django.db import transaction, models
 from cards.services import CardIntegrationService
 from transfers.models import Transfer
 
@@ -387,6 +387,20 @@ class JuniorTransferRequestCreateView(APIView):
         if junior_account.available_balance < amount:
             return Response({'amount': 'Niewystarczające środki na koncie.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        from django.utils import timezone
+        today = timezone.now().date()
+        spent_today = JuniorTransferRequest.objects.filter(
+            junior_account=junior_account,
+            status=JuniorTransferRequest.Status.APPROVED,
+            reviewed_at__date=today,
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
+        if spent_today + amount > junior_profile.daily_limit:
+            remaining = max(junior_profile.daily_limit - spent_today, Decimal('0'))
+            return Response(
+                {'amount': f'Przekroczony dzienny limit przelewów ({junior_profile.daily_limit} PLN). Pozostało: {remaining} PLN.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         req = JuniorTransferRequest.objects.create(
             junior_account=junior_account,
             parent_account=parent_account,
@@ -394,6 +408,7 @@ class JuniorTransferRequestCreateView(APIView):
             recipient_iban=serializer.validated_data['recipient_iban'],
             recipient_name=serializer.validated_data['recipient_name'],
             title=serializer.validated_data['title'],
+            system_route=serializer.validated_data.get('system_route', JuniorTransferRequest.SystemRoute.ELIXIR),
         )
         return Response(JuniorTransferRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
@@ -409,7 +424,9 @@ class JuniorTransferRequestListView(generics.ListAPIView):
         ).first()
         if not junior_account:
             return JuniorTransferRequest.objects.none()
-        return JuniorTransferRequest.objects.filter(junior_account=junior_account)
+        return JuniorTransferRequest.objects.filter(
+            junior_account=junior_account
+        ).select_related('junior_account__user')
 
 
 class ParentTransferRequestListView(generics.ListAPIView):
@@ -418,12 +435,10 @@ class ParentTransferRequestListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        parent_account = Account.objects.filter(user=self.request.user).first()
-        if not parent_account:
-            return JuniorTransferRequest.objects.none()
         return JuniorTransferRequest.objects.filter(
-            parent_account=parent_account, status=JuniorTransferRequest.Status.PENDING
-        )
+            parent_account__user=self.request.user,
+            status=JuniorTransferRequest.Status.PENDING,
+        ).select_related('junior_account__user')
 
 
 class ParentTransferRequestApproveView(APIView):
@@ -439,23 +454,93 @@ class ParentTransferRequestApproveView(APIView):
         except JuniorTransferRequest.DoesNotExist:
             return Response({'detail': 'Wniosek nie istnieje lub już został rozpatrzony.'}, status=status.HTTP_404_NOT_FOUND)
 
+        system_route = req.system_route
+
         with transaction.atomic():
             locked_junior = Account.objects.select_for_update().get(pk=req.junior_account.pk)
             if locked_junior.available_balance < req.amount:
                 return Response({'detail': 'Dziecko nie ma wystarczających środków.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            locked_junior.balance -= req.amount
-            locked_junior.save(update_fields=['balance'])
-
-            Transfer.objects.create(
-                sender_account=locked_junior,
-                recipient_iban=req.recipient_iban,
-                recipient_name=req.recipient_name,
-                amount=req.amount,
-                title=req.title,
-                system_route='INTERNAL',
-                status='COMPLETED',
-            )
+            if system_route == JuniorTransferRequest.SystemRoute.INTERNAL:
+                try:
+                    receiver = Account.objects.select_for_update().get(iban=req.recipient_iban)
+                except Account.DoesNotExist:
+                    return Response({'detail': 'Nie znaleziono rachunku odbiorcy w naszym banku.'}, status=status.HTTP_400_BAD_REQUEST)
+                locked_junior.balance -= req.amount
+                locked_junior.save(update_fields=['balance'])
+                receiver.balance += req.amount
+                receiver.save(update_fields=['balance'])
+                transfer = Transfer.objects.create(
+                    sender_account=locked_junior,
+                    recipient_iban=req.recipient_iban,
+                    recipient_name=req.recipient_name,
+                    amount=req.amount,
+                    title=req.title,
+                    system_route='INTERNAL',
+                    status='COMPLETED',
+                )
+            elif system_route == JuniorTransferRequest.SystemRoute.ELIXIR:
+                from transfers.services import ElixirIntegrationService
+                locked_junior.blocked_funds += req.amount
+                locked_junior.save(update_fields=['blocked_funds'])
+                transfer = Transfer.objects.create(
+                    sender_account=locked_junior,
+                    recipient_iban=req.recipient_iban,
+                    recipient_name=req.recipient_name,
+                    amount=req.amount,
+                    title=req.title,
+                    system_route='ELIXIR',
+                    status='PENDING',
+                )
+                try:
+                    ElixirIntegrationService.send_transfer(transfer)
+                except Exception as e:
+                    raise e
+            elif system_route == JuniorTransferRequest.SystemRoute.EXPRESS_ELIXIR:
+                from transfers.services import ExpressElixirIntegrationService
+                locked_junior.blocked_funds += req.amount
+                locked_junior.save(update_fields=['blocked_funds'])
+                transfer = Transfer.objects.create(
+                    sender_account=locked_junior,
+                    recipient_iban=req.recipient_iban,
+                    recipient_name=req.recipient_name,
+                    amount=req.amount,
+                    title=req.title,
+                    system_route='EXPRESS_ELIXIR',
+                    status='PENDING',
+                )
+                try:
+                    ExpressElixirIntegrationService.send_transfer(transfer)
+                except Exception as e:
+                    raise e
+            elif system_route == JuniorTransferRequest.SystemRoute.SORBNET:
+                from transfers.services import SorbnetIntegrationService
+                transfer = Transfer.objects.create(
+                    sender_account=locked_junior,
+                    recipient_iban=req.recipient_iban,
+                    recipient_name=req.recipient_name,
+                    amount=req.amount,
+                    title=req.title,
+                    system_route='SORBNET',
+                    status='PENDING',
+                )
+                try:
+                    sorbnet_status = SorbnetIntegrationService.send_transfer(transfer)
+                    if sorbnet_status == 'SETTLED':
+                        locked_junior.balance -= req.amount
+                        locked_junior.save(update_fields=['balance'])
+                        transfer.status = 'COMPLETED'
+                        transfer.save(update_fields=['status'])
+                    elif sorbnet_status == 'REJECTED':
+                        transfer.status = 'FAILED'
+                        transfer.save(update_fields=['status'])
+                    else:
+                        locked_junior.blocked_funds += req.amount
+                        locked_junior.save(update_fields=['blocked_funds'])
+                except Exception as e:
+                    raise e
+            else:
+                return Response({'detail': 'Nieobsługiwana trasa przelewu.'}, status=status.HTTP_400_BAD_REQUEST)
 
             req.status = JuniorTransferRequest.Status.APPROVED
             req.reviewed_at = timezone.now()

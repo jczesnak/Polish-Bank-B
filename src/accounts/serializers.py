@@ -177,9 +177,20 @@ class JuniorTransferRequestSerializer(serializers.ModelSerializer):
         model = JuniorTransferRequest
         fields = [
             'id', 'amount', 'recipient_iban', 'recipient_name', 'title',
-            'status', 'status_display', 'created_at', 'reviewed_at', 'junior_name',
+            'system_route', 'status', 'status_display', 'created_at', 'reviewed_at', 'junior_name',
         ]
         read_only_fields = ['id', 'status', 'created_at', 'reviewed_at']
+
+    def validate(self, data):
+        from accounts.models import Account
+        recipient_iban = data.get('recipient_iban')
+        system_route = data.get('system_route')
+        if system_route == JuniorTransferRequest.SystemRoute.INTERNAL:
+            if not Account.objects.filter(iban=recipient_iban).exists():
+                raise serializers.ValidationError(
+                    {'system_route': 'Przelew wewnętrzny możliwy tylko na konto w naszym banku. Wybierz Elixir lub inny system dla zewnętrznych odbiorców.'}
+                )
+        return data
 
     def get_junior_name(self, obj):
         u = obj.junior_account.user

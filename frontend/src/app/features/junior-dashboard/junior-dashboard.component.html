@@ -379,18 +379,41 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
                     </svg>
                   </div>
+                  <!-- Transfer out icon -->
+                  <div *ngIf="tx.type === 'transfer_out'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#fee2e2; border:2px solid #fca5a5;">
+                    <svg class="w-4 h-4" style="color:#dc2626" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                    </svg>
+                  </div>
+                  <!-- Transfer in icon -->
+                  <div *ngIf="tx.type === 'transfer_in'" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style="background:#dcfce7; border:2px solid #86efac;">
+                    <svg class="w-4 h-4" style="color:#16a34a" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18"/>
+                    </svg>
+                  </div>
                   <div>
-                    <p class="font-black text-sm" style="color:#1c1917">{{ tx.merchant_name || (tx.type === 'card' ? 'Platnosc karta' : 'Platnosc BLIK') }}</p>
+                    <p class="font-black text-sm" style="color:#1c1917">
+                      <ng-container *ngIf="tx.type === 'blik'">{{ tx.merchant_name || 'Platnosc BLIK' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'card'">{{ tx.merchant_name || 'Platnosc karta' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'transfer_out'">{{ tx.recipient_name || tx.title || 'Przelew wychodzący' }}</ng-container>
+                      <ng-container *ngIf="tx.type === 'transfer_in'">{{ tx.recipient_name || tx.title || 'Przelew przychodzący' }}</ng-container>
+                    </p>
                     <div class="flex items-center gap-2">
                       <p class="text-xs font-bold" style="color:#a8a29e">{{ tx.created_at | date:'dd.MM.yyyy HH:mm' }}</p>
                       <span class="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-full"
-                            [style.background]="tx.type === 'card' ? '#ede9fe' : '#fef9c3'"
-                            [style.color]="tx.type === 'card' ? '#7c3aed' : '#92400e'">{{ tx.type === 'card' ? 'Karta' : 'BLIK' }}</span>
+                            [style.background]="tx.type === 'card' ? '#ede9fe' : tx.type === 'transfer_out' ? '#fee2e2' : tx.type === 'transfer_in' ? '#dcfce7' : '#fef9c3'"
+                            [style.color]="tx.type === 'card' ? '#7c3aed' : tx.type === 'transfer_out' ? '#dc2626' : tx.type === 'transfer_in' ? '#16a34a' : '#92400e'">
+                        {{ tx.type === 'card' ? 'Karta' : tx.type === 'transfer_out' ? 'Przelew' : tx.type === 'transfer_in' ? 'Wpływ' : 'BLIK' }}
+                      </span>
                     </div>
                   </div>
                 </div>
                 <div class="text-right">
-                  <p class="font-black text-sm" style="color:#1c1917">-{{ tx.amount }} <span class="text-xs" style="color:#a8a29e">PLN</span></p>
+                  <p class="font-black text-sm" [style.color]="tx.type === 'transfer_in' ? '#16a34a' : '#1c1917'">
+                    {{ tx.type === 'transfer_in' ? '+' : '-' }}{{ tx.amount }} <span class="text-xs" style="color:#a8a29e">PLN</span>
+                  </p>
                   <p class="text-xs font-black" [ngClass]="statusClass(tx.status)">{{ statusLabel(tx.status) }}</p>
                 </div>
               </div>
@@ -559,6 +582,18 @@
                class="w-full py-3 px-4 rounded-2xl font-bold outline-none transition-all"
                style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;"
                placeholder="np. Za urodziny">
+      </div>
+
+      <div>
+        <label class="block text-xs font-black uppercase tracking-widest mb-1.5" style="color:#5b21b6">Rodzaj przelewu</label>
+        <select formControlName="system_route"
+                class="w-full py-3 px-4 rounded-2xl font-bold outline-none transition-all"
+                style="background:#f5f3ff; border:3px solid #c4b5fd; color:#1e1b4b;">
+          <option value="INTERNAL">Wewnętrzny (w naszym banku)</option>
+          <option value="ELIXIR">Elixir (inny bank, standardowy)</option>
+          <option value="EXPRESS_ELIXIR">Express Elixir (inny bank, ekspresowy)</option>
+          <option value="SORBNET">Sorbnet (duże kwoty)</option>
+        </select>
       </div>
 
       <div *ngIf="transferError()" class="rounded-2xl px-4 py-3 text-sm font-bold"

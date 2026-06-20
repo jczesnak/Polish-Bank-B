@@ -80,10 +80,19 @@ class JuniorTransferRequest(models.Model):
     parent_account = models.ForeignKey(
         'Account', on_delete=models.CASCADE, related_name='junior_transfer_requests_to_review'
     )
+    class SystemRoute(models.TextChoices):
+        INTERNAL = 'INTERNAL', 'Wewnętrzny'
+        ELIXIR = 'ELIXIR', 'Elixir'
+        EXPRESS_ELIXIR = 'EXPRESS_ELIXIR', 'Express Elixir'
+        SORBNET = 'SORBNET', 'Sorbnet'
+
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     recipient_iban = models.CharField(max_length=34)
     recipient_name = models.CharField(max_length=200)
     title = models.CharField(max_length=200)
+    system_route = models.CharField(
+        max_length=20, choices=SystemRoute.choices, default=SystemRoute.ELIXIR
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)

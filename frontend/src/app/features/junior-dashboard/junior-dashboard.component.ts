@@ -32,6 +32,7 @@ interface TransferRequest {
   recipient_iban: string;
   recipient_name: string;
   title: string;
+  system_route: string;
   status: string;
   status_display: string;
   created_at: string;
@@ -41,10 +42,13 @@ interface HistoryEntry {
   id: string;
   amount: string;
   currency: string;
-  merchant_name: string;
+  merchant_name?: string;
+  recipient_name?: string;
+  recipient_iban?: string;
+  title?: string;
   status: string;
   created_at: string;
-  type: 'blik' | 'card';
+  type: 'blik' | 'card' | 'transfer_out' | 'transfer_in';
 }
 
 @Component({
@@ -106,6 +110,7 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
     recipient_iban: ['', [Validators.required, Validators.pattern('^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$')]],
     recipient_name: ['', Validators.required],
     title: ['', Validators.required],
+    system_route: ['ELIXIR', Validators.required],
   });
 
   pollingInterval: any;
@@ -139,11 +144,25 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
     forkJoin({
       blik: this.http.get<BlikTransaction[]>('/api/blik/transactions/'),
       cards: this.http.get<CardTransaction[]>('/api/cards/transactions/'),
+      transfersOut: this.http.get<any[]>('/api/transfers/'),
+      transfersIn: this.http.get<any[]>('/api/transfers/incoming/'),
     }).subscribe({
-      next: ({ blik, cards }) => {
+      next: ({ blik, cards, transfersOut, transfersIn }) => {
         const blikEntries: HistoryEntry[] = blik.map(t => ({ ...t, type: 'blik' as const }));
         const cardEntries: HistoryEntry[] = cards.map(t => ({ ...t, type: 'card' as const }));
-        const merged = [...blikEntries, ...cardEntries]
+        const outEntries: HistoryEntry[] = transfersOut.map(t => ({
+          id: t.id, amount: t.amount, currency: 'PLN',
+          recipient_name: t.recipient_name, recipient_iban: t.recipient_iban,
+          title: t.title, status: t.status, created_at: t.created_at,
+          type: 'transfer_out' as const,
+        }));
+        const inEntries: HistoryEntry[] = transfersIn.map(t => ({
+          id: t.id, amount: t.amount, currency: 'PLN',
+          recipient_name: t.sender_name, title: t.title,
+          status: t.status, created_at: t.created_at,
+          type: 'transfer_in' as const,
+        }));
+        const merged = [...blikEntries, ...cardEntries, ...outEntries, ...inEntries]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         this.history.set(merged);
         this.loadingHistory.set(false);
@@ -278,6 +297,7 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
         recipient_iban: prefill.recipient_iban ?? '',
         recipient_name: prefill.recipient_name ?? '',
         title: prefill.title ?? '',
+        system_route: prefill.system_route ?? 'ELIXIR',
       });
     }
     this.showTransferModal.set(true);
