@@ -107,7 +107,8 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
 
   transferForm = this.fb.group({
     amount: ['', [Validators.required, Validators.min(0.01)]],
-    recipient_iban: ['', [Validators.required, Validators.pattern('^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$')]],
+    // IBAN dopuszcza spacje (np. wklejony "PL00 0000 ..."); usuwamy je przy wysyłce.
+    recipient_iban: ['', [Validators.required, Validators.pattern('^[A-Z]{2}[0-9]{2}[A-Z0-9 ]{1,38}$')]],
     recipient_name: ['', Validators.required],
     title: ['', Validators.required],
     system_route: ['ELIXIR', Validators.required],
@@ -288,7 +289,9 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
   }
 
   openTransferModal(prefill?: Partial<TransferRequest>) {
-    this.transferForm.reset();
+    // reset() bez wartości wyzerowałby system_route do null (pole required),
+    // przez co formularz zostawał niepoprawny i przycisk był wyłączony.
+    this.transferForm.reset({ system_route: 'ELIXIR' });
     this.transferError.set('');
     this.transferSuccess.set('');
     if (prefill) {
@@ -313,7 +316,11 @@ export class JuniorDashboardComponent implements OnInit, OnDestroy {
     this.transferLoading.set(true);
     this.transferError.set('');
     this.transferSuccess.set('');
-    this.http.post<TransferRequest>('/api/accounts/junior/transfer-requests/', this.transferForm.value).subscribe({
+    const payload = {
+      ...this.transferForm.value,
+      recipient_iban: (this.transferForm.value.recipient_iban ?? '').replace(/\s/g, ''),
+    };
+    this.http.post<TransferRequest>('/api/accounts/junior/transfer-requests/', payload).subscribe({
       next: () => {
         this.transferLoading.set(false);
         this.transferSuccess.set('Wniosek wysłany! Czeka na zatwierdzenie rodzica.');

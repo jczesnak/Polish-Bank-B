@@ -96,6 +96,13 @@ export class DashboardComponent implements OnInit {
   showJuniorModal = signal(false);
   selectedJunior = signal<any>(null);
 
+  // Podgląd historii transakcji dziecka (rodzic)
+  showJuniorHistoryModal = signal(false);
+  juniorHistory = signal<any[]>([]);
+  juniorHistoryName = signal('');
+  loadingJuniorHistory = signal(false);
+  juniorHistoryError = signal('');
+
   juniorTransferRequests = signal<any[]>([]);
   showTransferApprovalModal = signal(false);
   selectedTransferRequest = signal<any>(null);
@@ -440,6 +447,51 @@ export class DashboardComponent implements OnInit {
   closeJuniorModal() {
     this.showJuniorModal.set(false);
     this.selectedJunior.set(null);
+  }
+
+  openJuniorHistory(junior: any) {
+    this.showJuniorHistoryModal.set(true);
+    this.juniorHistory.set([]);
+    this.juniorHistoryError.set('');
+    this.juniorHistoryName.set(`${junior.user.first_name} ${junior.user.last_name}`);
+    this.loadingJuniorHistory.set(true);
+    this.http.get<any>(`/api/accounts/junior/${junior.id}/history/`).subscribe({
+      next: (res) => {
+        this.juniorHistory.set(res.history ?? []);
+        this.loadingJuniorHistory.set(false);
+      },
+      error: () => {
+        this.loadingJuniorHistory.set(false);
+        this.juniorHistoryError.set('Nie udało się pobrać historii.');
+      },
+    });
+  }
+
+  closeJuniorHistory() {
+    this.showJuniorHistoryModal.set(false);
+    this.juniorHistory.set([]);
+  }
+
+  historyTypeLabel(type: string): string {
+    const map: Record<string, string> = {
+      transfer_out: 'Przelew wychodzący', transfer_in: 'Wpływ',
+      blik: 'BLIK', card: 'Karta',
+    };
+    return map[type] ?? type;
+  }
+
+  historyAmountSign(type: string): string {
+    return type === 'transfer_in' ? '+' : '−';
+  }
+
+  historyStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      PENDING: 'Oczekuje', PROCESSING: 'W realizacji', COMPLETED: 'Zrealizowana',
+      FAILED: 'Nieudana', CANCELLED: 'Anulowana', AML_SUSPENDED: 'Wstrzymana (AML)',
+      AUTHORIZED: 'Autoryzowana', SETTLED: 'Rozliczona', REFUNDED: 'Zwrot',
+      REJECTED: 'Odrzucona', USED: 'Użyty', EXPIRED: 'Wygasły', ACTIVE: 'Aktywny',
+    };
+    return map[status] ?? status;
   }
   
   saveJuniorLimits() {
