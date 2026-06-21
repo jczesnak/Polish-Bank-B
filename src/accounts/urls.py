@@ -4,6 +4,7 @@ from .views import (
     RegisterView, LoginView, MeView, ChangePasswordView,
     AccountListView, AccountDetailView, AccountBalanceView, TopUpView,
     SetBlikPinView, JuniorListView, JuniorDetailView, JuniorTopUpView, JuniorCardTopUpView,
+    JuniorTransactionHistoryView,
     JuniorTransferRequestCreateView, JuniorTransferRequestListView,
     ParentTransferRequestListView, ParentTransferRequestApproveView, ParentTransferRequestRejectView,
 )
@@ -22,6 +23,7 @@ urlpatterns = [
     path('accounts/junior/<int:pk>/', JuniorDetailView.as_view(), name='junior-detail'),
     path('accounts/junior/<int:pk>/topup/', JuniorTopUpView.as_view(), name='junior-topup'),
     path('accounts/junior/<int:pk>/topup-card/', JuniorCardTopUpView.as_view(), name='junior-topup-card'),
+    path('accounts/junior/<int:pk>/history/', JuniorTransactionHistoryView.as_view(), name='junior-history'),
     path('auth/pin/', SetBlikPinView.as_view(), name='auth-blik-pin'),
     # Przelewy Junior
     path('accounts/junior/transfer-requests/', JuniorTransferRequestCreateView.as_view(), name='junior-transfer-request-create'),

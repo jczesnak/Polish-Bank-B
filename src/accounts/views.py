@@ -168,6 +168,80 @@ class JuniorDetailView(generics.RetrieveUpdateAPIView):
         return JuniorProfile.objects.filter(parent=self.request.user)
 
 
+class JuniorTransactionHistoryView(APIView):
+    """Rodzic ogląda pełną historię transakcji swojego dziecka (Junior).
+
+    Łączy przelewy wychodzące i przychodzące, transakcje BLIK oraz transakcje
+    kartą dziecka w jedną, posortowaną listę. Dostęp ma wyłącznie rodzic
+    przypisany do danego JuniorProfile.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from transfers.models import Transfer
+        from blik.models import BlikTransaction
+        from cards.models import CardTransaction
+
+        try:
+            profile = JuniorProfile.objects.select_related('user').get(
+                pk=pk, parent=request.user
+            )
+        except JuniorProfile.DoesNotExist:
+            return Response({'detail': 'Konto Junior nie istnieje.'}, status=status.HTTP_404_NOT_FOUND)
+
+        child = profile.user
+        child_ibans = list(
+            Account.objects.filter(user=child).values_list('iban', flat=True)
+        )
+
+        entries = []
+
+        for t in Transfer.objects.filter(sender_account__user=child):
+            entries.append({
+                'id': str(t.id), 'type': 'transfer_out',
+                'amount': str(t.amount), 'currency': 'PLN',
+                'recipient_name': t.recipient_name, 'recipient_iban': t.recipient_iban,
+                'title': t.title, 'status': t.status,
+                'created_at': t.created_at,
+            })
+
+        for t in Transfer.objects.filter(recipient_iban__in=child_ibans):
+            entries.append({
+                'id': str(t.id), 'type': 'transfer_in',
+                'amount': str(t.amount), 'currency': 'PLN',
+                'recipient_name': f"{t.sender_account.user.first_name} {t.sender_account.user.last_name}".strip(),
+                'title': t.title, 'status': t.status,
+                'created_at': t.created_at,
+            })
+
+        for b in BlikTransaction.objects.filter(user=child):
+            entries.append({
+                'id': str(b.id), 'type': 'blik',
+                'amount': str(b.amount), 'currency': b.currency,
+                'merchant_name': b.merchant_name, 'status': b.status,
+                'created_at': b.created_at,
+            })
+
+        for c in CardTransaction.objects.filter(card__account__user=child):
+            entries.append({
+                'id': str(c.id), 'type': 'card',
+                'amount': str(c.amount), 'currency': c.currency,
+                'merchant_name': c.merchant_name, 'status': c.status,
+                'created_at': c.created_at,
+            })
+
+        entries.sort(key=lambda e: e['created_at'], reverse=True)
+
+        return Response({
+            'junior': {
+                'id': profile.id,
+                'name': f"{child.first_name} {child.last_name}".strip(),
+                'email': child.email,
+            },
+            'history': entries,
+        })
+
+
 class JuniorTopUpView(APIView):
     permission_classes = [IsAuthenticated]
 
