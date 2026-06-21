@@ -19,14 +19,15 @@ class TransferSerializer(serializers.ModelSerializer):
             'recipient_iban', 'recipient_name',
             'amount', 'title', 'system_route', 'system_route_display',
             'status', 'status_display', 'created_at', 'processed_at',
+            'swift_uetr', 'swift_charge_bearer', 'aml_explanation',
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'processed_at']
+        read_only_fields = ['id', 'status', 'created_at', 'processed_at', 'swift_uetr']
 
 
 class CreateTransferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transfer
-        fields = ['sender_account', 'recipient_iban', 'recipient_name', 'amount', 'title', 'system_route']
+        fields = ['sender_account', 'recipient_iban', 'recipient_name', 'amount', 'title', 'system_route', 'swift_charge_bearer']
 
     def validate(self, data):
         account = data['sender_account']
