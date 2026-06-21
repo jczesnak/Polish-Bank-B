@@ -10,9 +10,11 @@ class Transfer(models.Model):
         EXPRESS_ELIXIR = 'EXPRESS_ELIXIR', 'Express Elixir'
         KLIK = 'KLIK', 'KLIK'
         SORBNET = 'SORBNET', 'Sorbnet'
+        SWIFT = 'SWIFT', 'SWIFT (Międzynarodowy)'
 
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Oczekujący'
+        AML_SUSPENDED = 'AML_SUSPENDED', 'Wstrzymany (AML)'
         PROCESSING = 'PROCESSING', 'W realizacji'
         COMPLETED = 'COMPLETED', 'Zrealizowany'
         FAILED = 'FAILED', 'Nieudany'
@@ -34,6 +36,18 @@ class Transfer(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    # Pola specyficzne dla SWIFT (GPI)
+    swift_uetr = models.UUIDField(null=True, blank=True, help_text='Unique End-to-end Transaction Reference (SWIFT GPI)')
+    swift_charge_bearer = models.CharField(
+        max_length=4,
+        null=True,
+        blank=True,
+        choices=[('OUR', 'OUR – Pokrywa nadawca'), ('SHA', 'SHA – Dzielone'), ('BEN', 'BEN – Pokrywa odbiorca')],
+        help_text='Opcja podziału kosztów SWIFT (ChrgBr)'
+    )
+    aml_explanation = models.TextField(
+        null=True, blank=True, help_text='Wyjaśnienie zablokowanego przelewu w ramach AML'
+    )
 
     class Meta:
         db_table = 'transfers'

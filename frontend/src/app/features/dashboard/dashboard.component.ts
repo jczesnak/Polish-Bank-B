@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe } from '@angular/common';
 import { forkJoin, catchError, of } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
@@ -49,6 +49,7 @@ export interface UnifiedTransaction {
   system_route?: string;
   system_route_display?: string;
   merchant_name?: string;
+  aml_explanation?: string;
 }
 
 export interface Transfer {
@@ -64,12 +65,13 @@ export interface Transfer {
   status: string;
   created_at: string;
   direction?: 'IN' | 'OUT';
+  aml_explanation?: string;
 }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, NgClass, NgIf, NgFor, DatePipe, SlicePipe],
+  imports: [NgClass, NgIf, NgFor, RouterLink, ReactiveFormsModule, FormsModule, DecimalPipe, DatePipe, SlicePipe],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -162,7 +164,7 @@ export class DashboardComponent implements OnInit {
   showTransferModal = signal(false);
   showBlikModal = signal(false);
 
-  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet'>('internal');
+  selectedTransferType = signal<'internal' | 'standard' | 'express' | 'sorbnet' | 'swift'>('internal');
   transferLoading = signal(false);
   transferError = signal('');
 
@@ -171,6 +173,14 @@ export class DashboardComponent implements OnInit {
   blikInterval: any;
   blikLoading = signal(false);
   blikError = signal('');
+
+  // AML Modal State
+  isAmlModalOpen = signal(false);
+  selectedAmlTransfer = signal<UnifiedTransaction | Transfer | null>(null);
+  amlExplanation = signal('');
+  amlLoading = signal(false);
+  amlError = signal('');
+
   blikConfirmed = signal(false);
 
   pendingBlikTransaction = signal<BlikTransaction | null>(null);
@@ -218,6 +228,7 @@ export class DashboardComponent implements OnInit {
     { key: 'standard' as const, label: 'Elixir' },
     { key: 'express' as const, label: 'Express' },
     { key: 'sorbnet' as const, label: 'Sorbnet' },
+    { key: 'swift' as const, label: 'SWIFT' },
   ];
 
   readonly selectedTypeInfo = computed(() => {
@@ -226,8 +237,9 @@ export class DashboardComponent implements OnInit {
       standard: { time: 'Rozliczenie w sesjach KIR', fee: 'Darmowy' },
       express:  { time: 'Przelew natychmiastowy', fee: 'Darmowy' },
       sorbnet:  { time: 'System RTGS dla dużych kwot', fee: 'Prowizja 1 PLN' },
+      swift:    { time: 'Przelew zagraniczny (1-2 dni)', fee: 'Prowizja 0,35%' },
     };
-    return map[this.selectedTransferType()];
+    return map[this.selectedTransferType() as keyof typeof map] || { time: '', fee: '' };
   });
 
   readonly totalBalance = computed(() =>
@@ -315,6 +327,7 @@ export class DashboardComponent implements OnInit {
     recipient: [''],
     account_number: ['', Validators.required],
     title: ['', Validators.required],
+    swift_charge_bearer: ['SHA'],
   });
 
   orderCardForm = this.fb.group({
@@ -756,7 +769,7 @@ export class DashboardComponent implements OnInit {
           id: t.id, type: 'TRANSFER', direction: 'OUT',
           amount: t.amount, currency: 'PLN', status: t.status, created_at: t.created_at,
           title: t.title, recipient_name: t.recipient_name, system_route_display: t.system_route_display || t.system_route,
-          system_route: t.system_route
+          system_route: t.system_route, aml_explanation: t.aml_explanation
         }));
         
         incoming.forEach(t => unified.push({
@@ -864,14 +877,15 @@ export class DashboardComponent implements OnInit {
     this.transferLoading.set(true);
     this.transferError.set('');
 
-    const systemMap = { internal: 'INTERNAL', standard: 'ELIXIR', express: 'EXPRESS_ELIXIR', sorbnet: 'SORBNET' };
+    const systemMap: Record<string, string> = { internal: 'INTERNAL', standard: 'ELIXIR', express: 'EXPRESS_ELIXIR', sorbnet: 'SORBNET', swift: 'SWIFT' };
     const v = this.transferForm.value;
     const isInternal = this.selectedTransferType() === 'internal';
+    const isSwift = this.selectedTransferType() === 'swift';
 
     const amount = parseFloat((v['amount'] as string) || '0').toFixed(2);
     const recipient = (v['recipient'] as string) || 'odbiorca';
 
-    const payload = {
+    const payload: any = {
       sender_account: v['sender_account'],
       recipient_iban: (v['account_number'] as string).replace(/\s/g, ''),
       recipient_name: v['recipient'],
@@ -879,6 +893,9 @@ export class DashboardComponent implements OnInit {
       title: v['title'],
       system_route: systemMap[this.selectedTransferType()],
     };
+    if (isSwift) {
+      payload['swift_charge_bearer'] = (v as any)['swift_charge_bearer'] || 'SHA';
+    }
 
     const endpointUrl = isInternal ? '/api/internal/' : '/api/transfers/';
 
@@ -900,5 +917,40 @@ export class DashboardComponent implements OnInit {
         }
       },
     });
+  }
+
+  openAmlModal(transfer: UnifiedTransaction | Transfer) {
+    this.selectedAmlTransfer.set(transfer);
+    this.amlExplanation.set('');
+    this.amlError.set('');
+    this.isAmlModalOpen.set(true);
+  }
+
+  closeAmlModal() {
+    this.isAmlModalOpen.set(false);
+    this.selectedAmlTransfer.set(null);
+  }
+
+  submitAmlExplanation() {
+    const transfer = this.selectedAmlTransfer();
+    const explanation = this.amlExplanation().trim();
+    if (!transfer || !explanation) return;
+
+    this.amlLoading.set(true);
+    this.amlError.set('');
+
+    this.http.post<{status: string, message: string}>(`/api/transfers/${transfer.id}/aml-explain/`, { explanation })
+      .subscribe({
+        next: (res) => {
+          this.amlLoading.set(false);
+          this.notifSvc.add(res.message, res.status === 'ZAAKCEPTOWANE' ? 'in' : 'out');
+          this.closeAmlModal();
+          this.loadTransfers(); // Refresh the list
+        },
+        error: (err) => {
+          this.amlLoading.set(false);
+          this.amlError.set(err.error?.error || 'Błąd podczas wysyłania wyjaśnienia');
+        }
+      });
   }
 }
